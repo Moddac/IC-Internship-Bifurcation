@@ -20,24 +20,26 @@ class SDEModel():
         self.σ = σ
         return
 
-    def simul(self,T,N,X_0):
+    def simul(self,T,N,X_0,N_p=1):
         """
         Computes the solution of the stochastic SDE modelled using an uniform discretisation from 0 to T
         NB: it numerically solves an equation with random variables. To see the precision, one must 
         solve it multiple time and see the PDF, trajectories etc. 
+        N_p is the number of particles
         """
         #-----Init------
         dt = T/N
         ts = np.arange(0,T,dt)
-        X = np.zeros(N+1)
-        X[0] = X_0
+        X = np.zeros((N_p,N+1))
+        X[:,0] = X_0
         B_backward = 0 #Used if B_t is present in µ or σ
 
         for n,t in enumerate(ts):
-            δB = normal(0,np.sqrt(dt)) 
-            B_forward = B_backward + δB
-            X[n+1] = X[n] + self.µ(X[n],B_backward,t)*dt + self.σ(X[n],B_backward,t)*δB 
-            B_backward = B_forward
+            for i in range(N_p):
+                δB = normal(0,np.sqrt(dt)) 
+                B_forward = B_backward + δB
+                X[i,n+1] = X[i,n] + self.µ(X[:,n],B_backward,t,i)*dt + self.σ(X[:,n],B_backward,t,i)*δB 
+                B_backward = B_forward
 
         return X
     
