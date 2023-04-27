@@ -20,34 +20,30 @@ class SDEModel():
         self.σ = σ
         return
 
-    def simul(self,T,N,X_0,N_p):
+    def simul(self,N,dt,X_0):
         """
         Computes the solution of the stochastic SDE modelled using an uniform discretisation from 0 to T
         NB: it numerically solves an equation with random variables. To see the precision, one must 
         solve it multiple time and see the PDF, trajectories etc. 
-        N_p is the number of particles
-        X_0 ust be a function
         """
         #-----Init------
-        dt = T/N
-        ts = np.arange(0,T,dt)
-        X = np.zeros((N_p,N+1))
+        X = np.zeros(N+1)
         B_backward = 0 #Used if B_t is present in µ or σ
-        X[:,0] = X_0()  #normal(.1,np.sqrt(.1),size=N_p)
+        X[0] = X_0  
 
-        for n,t in enumerate(ts):
-            for i in range(N_p):
-                δB = normal(0,np.sqrt(dt)) 
-                B_forward = B_backward + δB
-                X[i,n+1] = X[i,n] + self.µ(X[:,n],B_backward,t,i)*dt + self.σ(X[:,n],B_backward,t,i)*δB 
-                B_backward = B_forward
+        for n in range(N):
+            δB = normal(0,np.sqrt(dt)) 
+            B_forward = B_backward + δB
+            X[n+1] = X[n] + self.µ(X[n],B_backward,n*dt)*dt + self.σ(X[n],B_backward,n*dt)*δB 
+            B_backward = B_forward
 
         return X
     
-    def solve(self,T,X_0,N_p,N=int(1e3),PDF=True,trajectory=True,nb_simul=int(1e4),nb_trajectory=5,reference_solution=None):
+    def solve(self,N,dt,X_0,PDF=True,trajectory=True,nb_simul=int(1e4),nb_trajectory=5,reference_solution=None):
         """
         Solves the SDE by iterating Riemann-Itô method nb_simul times
-        T is the final time, N the number of space discretisation 
+        N is the number of steps
+        dt is the time step
         PDF is if you want PDF to be plot
         trajectory is if you want trajectories to be plot
         referenced_solution is for comparing to a solution if it is known
@@ -55,20 +51,19 @@ class SDEModel():
 
         #-----Init-----
 
-        Xs_t = np.array([self.simul(T,N,X_0,N_p) for _ in range(nb_simul)])
+        Xs_t = np.array([self.simul(N,dt,X_0) for _ in range(nb_simul)])
 
         if PDF:
             fig, ax = plt.subplots()
-            i = np.random.choice(range(N_p)) #Randomly choose a particle (supposed id)    
             #-----Model of PDF-----
             #Taking the last element of the trajectory (i.e. at time t=T) to study the PDF
-            Xs_T = Xs_t[:,i,-1] #All simulations of particle i at time T
+            Xs_T = Xs_t[:,-1] #All simulations of particle i at time T
             histogram_Xs_T, bins_Xs_T = histPDF(Xs_T)
             ax.plot(bins_Xs_T,histogram_Xs_T,label='Simulation')
 
             if reference_solution is not None:
                 #-----Reference if solution known-----
-                Ys_T = np.array([reference_solution["proba"](T) for _ in range(nb_simul)])
+                Ys_T = np.array([reference_solution["proba"](N*dt) for _ in range(nb_simul)])
                 histogram_Ys_T, bins_Ys_T = histPDF(Ys_T)
 
                 ax.plot(bins_Ys_T,histogram_Ys_T,label='Reference')
@@ -77,15 +72,13 @@ class SDEModel():
 
         if trajectory:
             fig, ax = plt.subplots()    
-            i = np.random.choice(range(N_p)) #Randomly choose a particle (supposed id)    
             indxs = np.random.choice(range(nb_simul),size=nb_trajectory)
-            ts = np.linspace(0,T,N+1)
             for indx in indxs:
-                X_t = Xs_t[indx,i,:]
+                X_t = Xs_t[indx,:]
                 if reference_solution is not None:
-                    Y_t = np.array([reference_solution["traj"](t) for t in ts])
-                    ax.plot(ts,Y_t)
-                ax.plot(ts,X_t)
+                    Y_t = np.array([reference_solution["traj"](n*dt) for n in range(N)])
+                    ax.plot(range(N),Y_t)
+                ax.plot(range(N+1),X_t)
 
         plt.show()
         return Xs_t

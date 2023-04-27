@@ -1,5 +1,5 @@
 """
-Attempt to solve interacting particle SDE with Euler-Maruyama shceme for a white noise
+Attempt to solve interacting particle SDE with Euler-Maruyama shceme for a OU noise
 """
 
 import numpy as np
@@ -15,6 +15,13 @@ def V(x):
 def dV(x):
     return x**3 - x
 
+def η_OU(N):
+    if µ==None:
+        µ = lambda X,t: -X
+    if σ==None:
+        σ = lambda X,t: np.sqrt(2)
+
+    
 Z = None
 def ρ_st(x,m):
     f = lambda y: np.exp(-β*(V(y)+.5*θ*(y-m)**2))
@@ -57,8 +64,8 @@ def SDEsolve(N_p,N,dt,θ,β,X_0,plot_ref=False):
     def σ():
         return np.sqrt(2/β)
 
-    with writer1.saving(fig1, f'histogram_β={β}_θ={θ}.gif', dpi=100):
-        with writer2.saving(fig2, f'mean_β={β}_θ={θ}.gif', dpi=100):
+    with writer1.saving(fig1, f'histogram_OU_β={β}_θ={θ}.gif', dpi=100):
+        with writer2.saving(fig2, f'mean_OU_β={β}_θ={θ}.gif', dpi=100):
 
             for n in range(N):
                 #n is the time 
