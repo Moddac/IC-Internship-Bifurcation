@@ -16,12 +16,25 @@ def V(x):
 def dV(x):
     return x**3 - x
 
-def get_η_OU(N,dt):
+def get_η_H(N,dt):
+    #-----Init-----
     µ = lambda X,B,t: -X
     σ = lambda X,B,t: np.sqrt(2)
-    SDE = SDEModel(µ,σ)
-    return SDE.solve(N,dt,0,nb_simul=1)[0]
-    
+    Y = np.zeros((2,N+1))
+    Y[:,0] = 0
+    γ = 1
+    A = np.array([[0,1],
+                  [-1, -γ]])
+    D = np.array([[0, 0],
+                  [0, np.sqrt(γ)]])
+    y_η = np.array([1,0])
+
+    #-----Solving SDE-----
+    for n in range(N):
+        Y[:,n+1] = Y[:,n] + np.matmul(A,Y[:,n])*dt + np.sqrt(2)*np.matmul(D,normal(0,np.sqrt(dt),2))
+
+    return np.matmul(y_η,Y)
+
 def SDEsolve(N_p,N,dt,θ,β,X_0,plot=True):
     """
     Solving the SDE of interacting particles
@@ -34,12 +47,12 @@ def SDEsolve(N_p,N,dt,θ,β,X_0,plot=True):
     sqrt_dt = np.sqrt(dt)
     X = np.zeros((N_p,N+1))
     X[:,0] = X_0
-    η_OU = get_η_OU(N,dt)
+    η_H = get_η_H(N,dt)
 
     def µ(X):
         return -(dV(X[:,n]) + θ*(X[:,n]-np.mean(X[:,n])))
     def σ():
-        return np.sqrt(2/β)*η_OU[n]
+        return np.sqrt(2/β)*η_H[n]
 
     #-----Solver-----
     for n in range(N):
@@ -97,4 +110,3 @@ if __name__=='__main__':
     X_0 = normal(0,np.sqrt(.1)) 
     # SDEsolve(N_p,N,dt,θ,β,X_0,True)
     ms = bifurcation_scheme()
-

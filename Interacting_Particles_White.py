@@ -7,6 +7,7 @@ from numpy.random import normal
 import matplotlib.pyplot as plt 
 from matplotlib.animation import PillowWriter
 import scipy.integrate as integrate
+import scipy.optimize as optimize
 import time
 tim = time.time()
 
@@ -15,21 +16,27 @@ def V(x):
 def dV(x):
     return x**3 - x
 
-Z = None
-def ρ_st(x,m):
+############################################################################################
+#Finding critical values of beta and teta at wich bifurcation appears
+
+def ρ_st(x,m,β,θ):
     f = lambda y: np.exp(-β*(V(y)+.5*θ*(y-m)**2))
-    global Z
-    if Z==None:
-        Z = integrate.quad(f,-np.inf,np.inf)
+    Z = integrate.quad(f,-np.inf,np.inf)
     return f(x)/Z[0]
 
-def E_2():
-    return integrate.quad(lambda x: x**2*ρ_st(x,0),-np.inf,np.inf)[0]
+def E_2(β,θ):
+    return integrate.quad(lambda x: x**2*ρ_st(x,0,β,θ),-np.inf,np.inf)[0]
 
-def θ_c():
-    return 1/(β*E_2())
+def θ_c(β):
+    return optimize.newton(lambda θ: 1 - θ*β*E_2(β,θ),x0=0)
 
-def SDEsolve(N_p,N,dt,θ,β,X_0,plot_ref=False):
+def β_c(θ):
+    return optimize.newton(lambda β: 1 - θ*β*E_2(β,θ),x0=0)
+
+############################################################################################
+
+
+def SDEsolve(N_p,N,dt,θ,β,X_0,plot=True):
     """
     Solving the SDE of interacting particles
     N_p: number of particles
@@ -42,49 +49,64 @@ def SDEsolve(N_p,N,dt,θ,β,X_0,plot_ref=False):
     X = np.zeros((N_p,N+1))
     X[:,0] = X_0
 
-    #-----Fig-----
-    fig1, ax1 = plt.subplots()
-    fig2, ax2 = plt.subplots()
-    fig3, ax3 = plt.subplots()
-    ax1.set_title("Histogram") 
-    ax2.set_title("Mean")
-    ax3.scatter
-    writer1 = PillowWriter(fps=10)
-    writer2 = PillowWriter(fps=10)
-
     def µ(X):
         return -(dV(X[:,n]) + θ*(X[:,n]-np.mean(X[:,n])))
     def σ():
         return np.sqrt(2/β)
 
-    with writer1.saving(fig1, f'histogram_β={β}_θ={θ}.gif', dpi=100):
-        with writer2.saving(fig2, f'mean_β={β}_θ={θ}.gif', dpi=100):
+    #-----Solver-----
+    for n in range(N):
+        #n is the time 
+        X[:,n+1] = X[:,n] + µ(X)*dt + σ()*normal(0,sqrt_dt,N_p)
 
-            for n in range(N):
-                #n is the time 
-                X[:,n+1] = X[:,n] + µ(X)*dt + σ()*normal(0,sqrt_dt,N_p)
+    #-----Plot-----
+    #-----Fig-----
+    if plot:
+        fig1, ax1 = plt.subplots()
+        fig2, ax2 = plt.subplots()
+        fig3, ax3 = plt.subplots()
+        ax1.set_title("Histogram") 
+        ax2.set_title("Mean")
+        writer1 = PillowWriter(fps=10)
+        writer2 = PillowWriter(fps=10)
 
-                if n%10 == 0:
-                    ax1.clear()
-                    ax2.clear()
-                    _, bins, _ = ax1.hist(X[:,n+1],100,density=True)
-                    if plot_ref:
-                        ax1.plot(bins,ρ_st(bins,np.mean(X[:,n])))
-                    ax2.plot(range(n+1),np.mean(X[:,:n+1],axis=0))
-                    writer1.grab_frame()
-                    writer2.grab_frame()
+        with writer1.saving(fig1, f'histogram_β={β}_θ={θ}.gif', dpi=100):
+            with writer2.saving(fig2, f'mean_β={β}_θ={θ}.gif', dpi=100):
 
-    return 
+                    for n in np.arange(0,N,10):
+                        ax1.clear()
+                        ax2.clear()
+                        _, bins, _ = ax1.hist(X[:,n+1],100,density=True)
+                        ax1.plot(bins,ρ_st(bins,np.mean(X[:,n]),β,θ))
+                        ax2.plot(range(n+1),np.mean(X[:,:n+1],axis=0))
+                        writer1.grab_frame()
+                        writer2.grab_frame()
 
+    return X
+
+def bifurcation_scheme():
+    #PARAMETERS
+    N = 50_000
+    N_p = 1_000
+    dt = 0.01
+    θ = 1
+    βs = np.linspace(1,5,200)
+    ms = []
+    for β in βs:
+        X_0 = normal(0,np.sqrt(.1))
+        ms.append(np.mean(SDEsolve(N_p,N,dt,θ,β,X_0,False)[-1]))
+
+    plt.scatter(βs,ms)
+    plt.show()
+    return ms
 
 if __name__=='__main__':
 
     #PARAMETERS
     N = 10_000
     N_p = 1_000
-    β = 10
     dt = 0.01
     θ = 1
-    X_0 = normal(0,np.sqrt(.1)) 
-    SDEsolve(N_p,N,dt,θ,β,X_0,True)
-
+    X_0 = normal(0,np.sqrt(.1))
+    # SDEsolve(N_p,N,dt,θ,β,X_0,True)
+    ms = bifurcation_scheme()

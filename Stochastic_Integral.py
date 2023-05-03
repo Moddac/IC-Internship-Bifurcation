@@ -39,7 +39,7 @@ class SDEModel():
 
         return X
     
-    def solve(self,N,dt,X_0,PDF=True,trajectory=True,nb_simul=int(1e4),nb_trajectory=5,reference_solution=None):
+    def solve(self,N,dt,X_0,PDF=False,trajectory=False,nb_simul=int(1e4),nb_trajectory=5,reference_solution=None):
         """
         Solves the SDE by iterating Riemann-Itô method nb_simul times
         N is the number of steps
