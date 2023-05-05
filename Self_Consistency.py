@@ -40,14 +40,17 @@ def bifurcation_scheme():
 
 if __name__=='__main__':
 
+    α = 1
+    β = 1
+    θ = 1 
+    for x in np.linspace(-5,5,10):
+        f = lambda y,m: -β*(V(y)+.5*θ*(y-m)**2)
+        print(f(x,1))
+        print(R(1,1,1))
+
+
     #taking different values of x_0 to see bifurcation 
     # Xs_0 = np.linspace(-1,1,30)
-
-    xs = np.linspace(-1,1,10)
-    β = 1
-    θ = 1
-    for x in xs:
-        print(f_m(x,0))
 
     # for x_0 in Xs_0:
     #     m_st = optimize.newton(lambda m: m - R(m), x0=x_0)
