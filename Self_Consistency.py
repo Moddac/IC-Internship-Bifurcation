@@ -43,11 +43,6 @@ if __name__=='__main__':
     α = 1
     β = 1
     θ = 1 
-    for x in np.linspace(-5,5,10):
-        f = lambda y,m: -β*(V(y)+.5*θ*(y-m)**2)
-        print(f(x,1))
-        print(R(1,1,1))
-
 
     #taking different values of x_0 to see bifurcation 
     # Xs_0 = np.linspace(-1,1,30)
@@ -56,4 +51,5 @@ if __name__=='__main__':
     #     m_st = optimize.newton(lambda m: m - R(m), x0=x_0)
     #     print(m_st)
 
-    # bifurcation_scheme()
+    bifurcation_scheme()
+

@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 
 Zs = {} #Dict used for keeping the integration constant in the memory
 
-def σ(x):
-    return np.sqrt(2/β)
+def σ(_σ,σ_m,x):
+    return np.sqrt()
 
 def dσ(x):
     return 0

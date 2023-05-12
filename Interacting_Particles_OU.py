@@ -72,11 +72,11 @@ def SDEsolve(N_p,N,dt,θ,β,X_0,plot=True):
 
 def bifurcation_scheme():
     #PARAMETERS
-    N = 50_000
-    N_p = 1_000
+    N = 70_000
+    N_p = 2_000
     dt = 0.01
     θ = 1
-    βs = np.linspace(1,5,200)
+    βs = np.linspace(1,4,50)
     ms = []
     for β in βs:
         X_0 = normal(0,np.sqrt(.1))
@@ -89,12 +89,10 @@ def bifurcation_scheme():
 if __name__=='__main__':
 
     #PARAMETERS
-    N = 10_000
+    N = 20_000
     N_p = 1_000
     β = 1
     dt = 0.01
     θ = 1
-    X_0 = normal(0,np.sqrt(.1)) 
-    # SDEsolve(N_p,N,dt,θ,β,X_0,True)
     ms = bifurcation_scheme()
 
