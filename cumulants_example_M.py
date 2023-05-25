@@ -12,7 +12,12 @@ from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 import dill
 
-
+METHODS_IVP = ["RK45", 
+               "RK23",
+               "DOP853",
+               "Radau",
+               "BDF",
+               "LSODA"]
 ν = .5
 
 
@@ -95,9 +100,11 @@ def SolveMoment_Stationnary(N, α, θ, σ_m, σ):
     And in stationnary state
     """
     # -----Init-----
-    M0 = 0.01*np.ones(N)
-    M0[0] = .5
-    M0[1] = .5
+    #N.B. HArd to find the right initial condition
+    M0 = .5*np.ones(N)
+    M0[5:7] = 1.5
+    M0[7:N] = [4*i for i in range(1,N-6)]
+    
 
     # -----Solver-----
     def g(x): return f(0, x, α, θ, σ_m, σ)
@@ -110,11 +117,12 @@ def SolveMoment_Stationnary(N, α, θ, σ_m, σ):
 if __name__ == '__main__':
 
     # -----Init-----
-    Ns = [4, 8, 10]
+    Ns = [8, 10]
     α = 1
     θ = 4
     σ_m = .8
-    σs = list(np.linspace(1.8, 1.892, 50)) + list(np.linspace(1.893, 2., 50))
+    N_σ = 100
+    σs = list(np.linspace(1.8, 1.892, N_σ//2)) + list(np.linspace(1.893, 2., N_σ//2))
     # σs = np.linspace(1.8, 2., 200)
 
     t0 = 0
@@ -134,12 +142,12 @@ if __name__ == '__main__':
         for i, σ in enumerate(σs):
             if i % 10 == 0:
                 print(f"σ={σ}")
-            M1 = SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ)
+            # M1 = SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ)
             # print(M1.y[:, -1])
-            M1s.append(M1.y[0, -1])
+            # M1s.append(M1.y[0, -1])
 
-            # M1 = SolveMoment_Stationnary(N, α, θ, σ_m, σ)
-            # M1s.append(M1.x[0])
+            M1 = SolveMoment_Stationnary(N, α, θ, σ_m, σ)
+            M1s.append(M1.x[0])
 
         # -----Plot-----
         plt.scatter(σs, M1s, label=f"N={N}")
