@@ -114,7 +114,7 @@ if __name__ == '__main__':
     α = 1
     θ = 4
     σ_m = .8
-    σs = list(np.linspace(1.8, 1.892, 10)) + list(np.linspace(1.893, 2., 10))
+    σs = list(np.linspace(1.8, 1.892, 50)) + list(np.linspace(1.893, 2., 50))
     # σs = np.linspace(1.8, 2., 200)
 
     t0 = 0
@@ -135,7 +135,7 @@ if __name__ == '__main__':
             if i % 10 == 0:
                 print(f"σ={σ}")
             M1 = SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ)
-            print(M1.y[:, -1])
+            # print(M1.y[:, -1])
             M1s.append(M1.y[0, -1])
 
             # M1 = SolveMoment_Stationnary(N, α, θ, σ_m, σ)
