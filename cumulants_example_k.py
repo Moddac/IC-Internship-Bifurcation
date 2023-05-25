@@ -1,14 +1,12 @@
-#%%
+# %%
 """
 Example of cumulant method as shown in "Dimension reduction of noisy interacting systems"
-By trying to solve the equation on the cumulants k_n and without being stationnary 
+By trying to solve the equation on the cumulants k_n  
 """
 
 import numpy as np
-from numpy.random import normal
-from sympy import bell
-from math import factorial, comb
-from scipy.optimize import root, newton
+from math import factorial
+from scipy.optimize import root
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
@@ -22,17 +20,17 @@ def f(t, k, α, θ, σ_m, σ):
     """
     # -----Init-----
     N = k.shape[0]
-    _k = np.insert(k, [0, N, N], [0, 0, 0])
+    _k = np.zeros(N+3)
+    _k[1:N+1] = k #N.B: _k[0] is never used
 
-    # F is define with one more element because equations in the paper
     # Starts at n=1, so we will keep it that way
     F = np.zeros(N)
     F[0] = θ*_k[1]
-    F[1] = σ**2 #it is not sigma² / 2 because we multiply by n=2
+    F[1] = σ**2  # it is not sigma² / 2 because we multiply by n=2
 
     # -----Definition of f-----
     """
-    To define f a sum from 1 to n-1 which contains the three sums will be computed
+    To define f, a sum from 1 to n-1 which contains the three sums will be computed
     Then the last terms of the sum are added
     And we suppose B.C.: k_{N+1} = k_{N+2} = 0
     """
@@ -46,12 +44,16 @@ def f(t, k, α, θ, σ_m, σ):
                 for j in range(1, n-i+2)])
             for i in range(1, n)])
 
-        F[n-1] += n*((α-θ+σ_m**2*(ν+(n-1)/2))*_k[n]
-                   - _k[n+2]
-                   + factorial(n-1)*(
-                    Σ
-                   - 3*_k[n]*_k[2]/factorial(n-1)
-                   - _k[n]*_k[1]**2/factorial(n-1)))
+        F[n-1] += n*(
+            (
+                α-θ+σ_m**2*(ν+(n-1)/2))*_k[n]
+            - _k[n+2]
+            + factorial(n-1)*(
+                Σ
+                - 3*_k[n]*_k[2]/factorial(n-1)
+                - _k[n]*_k[1]**2/factorial(n-1)
+            )
+        )
 
     return F
 
@@ -62,7 +64,8 @@ def SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ):
     """
     # -----Init-----
     k0 = np.zeros(N)
-    k0[0] = 1; k0[1] = 1.5**2
+    k0[0] = 1
+    k0[1] = 1.5**2
 
     # -----Solver-----
     k = solve_ivp(f, (t0, t_end), k0,
@@ -70,59 +73,63 @@ def SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ):
 
     return k
 
-def SolveCumulant_Stationnary(N,α,θ,σ_m,σ):
+
+def SolveCumulant_Stationnary(N, α, θ, σ_m, σ):
     """
     Solving the cumulant ODE for 1 set of parameters
     And in stationnary state
     """
     # -----Init-----
     k0 = 0.01*np.ones(N)
-    k0[0] = .5 ; k0[1] = .5
-
+    k0[0] = .5
+    k0[1] = .5
 
     # -----Solver-----
-    g = lambda x: f(0,x,α,θ,σ_m,σ)
+    def g(x): return f(0, x, α, θ, σ_m, σ)
     k = root(g, k0)
 
     return k
 
-#%%
+
+# %%
 if __name__ == '__main__':
 
     # -----Init-----
-    Ns = [4,8,16]
+    Ns = [4, 8, 16]
     α = 1
     θ = 4
     σ_m = .8
-    σs = list(np.linspace(1.8, 1.892, 100)) + list(np.linspace(1.893,2.,100))
-    σs = np.linspace(1.8,2.,200)
+    σs = list(np.linspace(1.8, 1.892, 100)) + list(np.linspace(1.893, 2., 100))
+    σs = np.linspace(1.8, 2., 200)
 
     t0 = 0
     t_end = 10e4
 
     # -----Solving-----
     print("##########")
+    print("Parameters: ")
+    print(f"Ns={Ns}")
+    print(f"First σ: {σs[0]}, Last σ: {σs[-1]}")
+    print("##########")
     print("Starting solving...")
     for N in Ns:
         print(f"Solving for N={N}...")
         M1s = []
 
-        for i,σ in enumerate(σs):
+        for i, σ in enumerate(σs):
+            if i%10==0:
+                print(f"σ={σ}")
             M1 = SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ)
-            M1s.append(M1.y[0,-1])
-            
+            M1s.append(M1.y[0, -1])
+
             # M1 = SolveCumulant_Stationnary(N, α, θ, σ_m, σ)
             # M1s.append(M1.x[0])
 
         # -----Plot-----
-        plt.scatter(σs, M1s,label=f"N={N}")
+        plt.scatter(σs, M1s, label=f"N={N}")
 
     plt.xlabel("σ")
     plt.ylabel("m")
     plt.legend()
     plt.title("Mean with cumulant method")
     plt.show()
-
-
-
-# %%
