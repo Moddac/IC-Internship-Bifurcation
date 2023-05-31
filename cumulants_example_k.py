@@ -10,8 +10,23 @@ from scipy.optimize import root
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
+METHODS_IVP = ["RK45", 
+               "RK23",
+               "DOP853",
+               "Radau",
+               "BDF",
+               "LSODA"]
+METHODS_ROOT = ["hybr",
+                "lm",
+                "broyden1",
+                "broyden2",
+                "anderson",
+                "linearmixing",
+                "diagbroyden",
+                "excitingmixing",
+                "krylov",
+                "df-sane"]
 ν = .5
-
 
 def f(t, k, α, θ, σ_m, σ):
     """
@@ -95,12 +110,12 @@ def SolveCumulant_Stationnary(N, α, θ, σ_m, σ):
 if __name__ == '__main__':
 
     # -----Init-----
-    Ns = [4, 8, 16]
+    Ns = [4]#, 8, 16]
     α = 1
     θ = 4
     σ_m = .8
-    σs = list(np.linspace(1.8, 1.892, 100)) + list(np.linspace(1.893, 2., 100))
-    σs = np.linspace(1.8, 2., 200)
+    N_σ = 200
+    σs = np.linspace(1.8, 2., N_σ)
 
     t0 = 0
     t_end = 10e4
@@ -132,4 +147,7 @@ if __name__ == '__main__':
     plt.ylabel("m")
     plt.legend()
     plt.title("Mean with cumulant method")
-    plt.show()
+    plt.savefig('test.png')
+    plt.close()
+
+# %%
