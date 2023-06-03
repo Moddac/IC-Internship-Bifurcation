@@ -9,13 +9,17 @@ from math import factorial
 from scipy.optimize import root
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
+import time
+import json
 
-METHODS_IVP = ["RK45", 
-               "RK23",
-               "DOP853",
-               "Radau",
-               "BDF",
-               "LSODA"]
+# Explicit methods look really slow
+METHODS_IVP = [  # "RK45",
+    # "RK23",
+    # "DOP853",
+    "Radau",
+    "BDF",
+    "LSODA"]
+
 METHODS_ROOT = ["hybr",
                 "lm",
                 "broyden1",
@@ -28,6 +32,7 @@ METHODS_ROOT = ["hybr",
                 "df-sane"]
 ν = .5
 
+
 def f(t, k, α, θ, σ_m, σ):
     """
     This is the function to solve dk/dt = f(k,t) 
@@ -36,7 +41,7 @@ def f(t, k, α, θ, σ_m, σ):
     # -----Init-----
     N = k.shape[0]
     _k = np.zeros(N+3)
-    _k[1:N+1] = k #N.B: _k[0] is never used
+    _k[1:N+1] = k  # N.B: _k[0] is never used
 
     # Starts at n=1, so we will keep it that way
     F = np.zeros(N)
@@ -73,7 +78,7 @@ def f(t, k, α, θ, σ_m, σ):
     return F
 
 
-def SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ):
+def SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ, method):
     """
     Solving the cumulant ODE for 1 set of parameters
     """
@@ -84,7 +89,7 @@ def SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ):
 
     # -----Solver-----
     k = solve_ivp(f, (t0, t_end), k0,
-                  args=(α, θ, σ_m, σ), method='Radau')
+                  args=(α, θ, σ_m, σ), method=method)
 
     return k
 
@@ -105,49 +110,114 @@ def SolveCumulant_Stationnary(N, α, θ, σ_m, σ):
 
     return k
 
+def plotData(file_path):
+    """
+    File must be the same format as Data.json created
+    """
+    with open(file_path, "r") as file:
+        data = json.load(file)
+        
+    methods, Ns, σs = data["parameters"].values()
+    σs = np.array(σs)
+
+    for method in methods:
+        for N in Ns:
+
+            M1s, time, success =  data[method][f"{N}"].values()
+            M1s = np.array(M1s)
+
+            plt.scatter(σs[success], M1s[success], label=f"N={N}, time={time}s")
+
+        plt.xlabel("σ")
+        plt.ylabel("m")
+        plt.legend()
+        plt.title(f"Mean with cumulant solving ODE with method '{method}'")
+        plt.savefig(f"Figs/{method}.png")
+        plt.show()
+        plt.close()
 
 # %%
 if __name__ == '__main__':
 
-    # -----Init-----
-    Ns = [4]#, 8, 16]
-    α = 1
-    θ = 4
-    σ_m = .8
-    N_σ = 200
-    σs = np.linspace(1.8, 2., N_σ)
+    PLOT = False
+    SOLVE = True
+    FILE_NAME = "Data_k.json"
 
-    t0 = 0
-    t_end = 10e4
+    if SOLVE:
+        # -----Init-----
+        Ns = [4, 8]#, 16, 24]
+        α = 1
+        θ = 4
+        σ_m = .8
+        N_σ = 150
+        σs = np.linspace(1.8, 2., N_σ)
 
-    # -----Solving-----
-    print("##########")
-    print("Parameters: ")
-    print(f"Ns={Ns}")
-    print(f"First σ: {σs[0]}, Last σ: {σs[-1]}")
-    print("##########")
-    print("Starting solving...")
-    for N in Ns:
-        print(f"Solving for N={N}...")
-        M1s = []
+        # Writing parameters
+        data = {
+            "parameters": {}
+        }
+        for method in METHODS_IVP:
+            data[f"{method}"] = {
+                N: {
+                    "points": [],
+                    "time": 0,
+                    "success": []
+                }
+                for N in Ns}
+        data["parameters"] = {
+            "methods": METHODS_IVP,
+            "Ns": Ns,
+            "sigmas": list(σs)
+        }
+        json_dic = json.dumps(data, indent=4)
+        with open(FILE_NAME, "w") as file:
+            file.write(json_dic)
 
-        for i, σ in enumerate(σs):
-            if i%10==0:
-                print(f"σ={σ}")
-            M1 = SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ)
-            M1s.append(M1.y[0, -1])
+        t0 = 0
+        t_end = 10e4
 
-            # M1 = SolveCumulant_Stationnary(N, α, θ, σ_m, σ)
-            # M1s.append(M1.x[0])
+        # -----Solving-----
+        print("##########")
+        print("Parameters: ")
+        print(f"Ns={Ns}")
+        print(f"First σ: {σs[0]}, Last σ: {σs[-1]}, N_σ: {N_σ}")
+        print("##########")
 
-        # -----Plot-----
-        plt.scatter(σs, M1s, label=f"N={N}")
+        for method in METHODS_IVP:
 
-    plt.xlabel("σ")
-    plt.ylabel("m")
-    plt.legend()
-    plt.title("Mean with cumulant method")
-    plt.savefig('test.png')
-    plt.close()
+            print(f"Solving with method: {method}")
+            for N in Ns:
+
+                # Init
+                t1 = int(time.time())
+                print(f"Solving for N={N}...")
+                _data = data[method][N]
+                
+                for i, σ in enumerate(σs):
+
+                    M1 = SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ, method)
+                    _data["success"].append(M1.success)
+
+                    if M1.success:
+                        _data["points"].append(M1.y[0, -1])
+                    else:
+                        _data["points"].append(0)
+                        print(f"N={N}, σ={σ}, method={method} failed")
+
+                    # M1 = SolveCumulant_Stationnary(N, α, θ, σ_m, σ)
+                    # M1s.append(M1.x[0])
+
+                # Time
+                t2 = int(time.time())
+                _data["time"] = t2-t1
+
+                # Writing data
+                json_data = json.dumps(data, indent=4)
+                with open(FILE_NAME, "w") as file:
+                    file.write(json_data)
+
+    if PLOT:
+        file_path = "Data_01_06_k.json"
+        plotData(file_path)
 
 # %%

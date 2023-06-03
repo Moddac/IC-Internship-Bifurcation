@@ -89,8 +89,8 @@ def bifurcation_scheme():
 if __name__=='__main__':
 
     #PARAMETERS
-    N = 20_000
-    N_p = 1_000
+    N = 100_000
+    N_p = 10_000
     β = 1
     dt = 0.01
     θ = 1
