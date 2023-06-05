@@ -11,6 +11,7 @@ from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 import time
 import json
+import os
 
 # Explicit methods look really slow
 METHODS_IVP = [  # "RK45",
@@ -110,23 +111,27 @@ def SolveCumulant_Stationnary(N, α, θ, σ_m, σ):
 
     return k
 
+
 def plotData(file_path):
     """
     File must be the same format as Data.json created
     """
     with open(file_path, "r") as file:
         data = json.load(file)
-        
-    methods, Ns, σs = data["parameters"].values()
+
+    param = data["parameters"]
+    methods, Ns, σs = param["methods"], param["Ns"], param["sigmas"]
     σs = np.array(σs)
 
     for method in methods:
         for N in Ns:
 
-            M1s, time, success =  data[method][f"{N}"].values()
+            info = data[method][f"{N}"]
+            M1s, time, success = info["points"], info["time"], info["success"]
             M1s = np.array(M1s)
 
-            plt.scatter(σs[success], M1s[success], label=f"N={N}, time={time}s")
+            plt.scatter(σs[success], M1s[success],
+                        label=f"N={N}, time={time}s")
 
         plt.xlabel("σ")
         plt.ylabel("m")
@@ -136,27 +141,30 @@ def plotData(file_path):
         plt.show()
         plt.close()
 
-# %%
-if __name__ == '__main__':
 
-    PLOT = False
-    SOLVE = True
-    FILE_NAME = "Data_k.json"
+def checkFile(file_name, methods, Ns, σs, α, θ, σ_m):
+    """
+    This checks if the data file already exists.
+    It will search locally for a Data/data_parameters.json file and create
+    folders and file if they don't exist
 
-    if SOLVE:
-        # -----Init-----
-        Ns = [4, 8]#, 16, 24]
-        α = 1
-        θ = 4
-        σ_m = .8
-        N_σ = 150
-        σs = np.linspace(1.8, 2., N_σ)
+    If file already exists, checks which methods, N and sigmas have been done
+    and update the file with new parameters
 
+    Also returns a list of sigma to be computed, according to those which have already been done
+    and the new sigmas
+    """
+    if not os.path.exists("./Data"):
+        os.mkdir("./Data")
+
+    file_path = f"./Data/{file_name}"
+    if not os.path.isfile(file_path):
+        # If there is no file, create it with the parameters
         # Writing parameters
         data = {
             "parameters": {}
         }
-        for method in METHODS_IVP:
+        for method in methods:
             data[f"{method}"] = {
                 N: {
                     "points": [],
@@ -165,13 +173,112 @@ if __name__ == '__main__':
                 }
                 for N in Ns}
         data["parameters"] = {
-            "methods": METHODS_IVP,
+            "methods": methods,
             "Ns": Ns,
-            "sigmas": list(σs)
+            "sigmas": list(),
+            "alpha": α,
+            "theta": θ,
+            "sigma_m": σ_m,
         }
         json_dic = json.dumps(data, indent=4)
-        with open(FILE_NAME, "w") as file:
+        with open(file_path, "w") as file:
             file.write(json_dic)
+
+        σs_matrix = {}
+        for method in methods:
+            σs_matrix[f"{method}"] = {}
+            for N in Ns:
+                σs_matrix[f"{N}"] = σs
+
+        return methods, Ns, σs, σs_matrix
+
+    else:
+        # If the file exists, check the Ns, sigmas and methods
+        with open(file_path, "r") as file:
+            data = json.load(file)
+
+        param = data["parameters"]
+        _methods, _Ns, _σs = param["methods"], param["Ns"], param["sigmas"]
+
+        σs_union = np.union1d(σs, _σs).tolist()
+        # Values in sigmas but not in _sigmas
+        new_σs = np.setdiff1d(σs, _σs).tolist()
+        Ns_union = np.union1d(Ns, _Ns).tolist()
+        print(Ns, _Ns, Ns_union)
+        methods_union = np.union1d(methods, _methods).tolist()
+        σs_matrix = {}
+
+        # Updating file with new parameters
+        param["Ns"] = Ns_union
+        param["methods"] = methods_union
+        param["sigmas"] = σs_union
+
+        """
+        For now: data points for a model are writen only if all the sigmas are done
+        So we can check either if the lis "points" is empty or not
+        If empty: all the sigmas must be done
+        If not empty: only the new sigmas
+        TODO: write on the file sigma per sigma?
+        """
+        for method in methods_union:
+            σs_matrix[f"{method}"] = {}
+            σs_matrix_method = σs_matrix[f"{method}"]
+
+            if method not in _methods:
+                data[f"{method}"] = {}
+
+            data_method = data[f"{method}"]
+
+            for N in Ns_union:
+                str_N = str(N)
+
+                if str_N not in data_method.keys():
+                    data_method[str_N] = {
+                        "points": [],
+                        "time": 0,
+                        "success": []
+                    }
+
+                if str_N not in data_method.keys() or len(data_method[str_N]["points"]) == 0:
+                    # Case where N was not defined or was not done
+                    σs_matrix_method[str_N] = σs_union
+
+                else:
+                    # Else, only take the new sigmas
+                    σs_matrix_method[str_N] = new_σs
+
+        with open(file_path, "w") as f:
+            json.dump(data, f, indent=4)
+
+        return methods_union, Ns_union, σs_union, σs_matrix
+
+
+# %%
+if __name__ == '__main__':
+
+    PLOT = False
+    SOLVE = True
+
+    if SOLVE:
+        # -----Init-----
+        Ns = [4, 8]  # , 16, 24]
+        α = 1
+        θ = 4
+        σ_m = .8
+        N_σ = 30
+        σ_start, σ_end = 1.8, 2.
+        σs = np.linspace(1.8, 2., N_σ)
+        FILE_NAME = f"Data.json"
+        methods, Ns, σs, σs_matrix = checkFile(FILE_NAME,
+                                               METHODS_IVP,
+                                               Ns,
+                                               σs,
+                                               α,
+                                               θ,
+                                               σ_m)
+        print(methods, Ns, σs_matrix)
+        with open(f"./Data/{FILE_NAME}", "r") as file:
+            data = json.load(file)
 
         t0 = 0
         t_end = 10e4
@@ -183,7 +290,7 @@ if __name__ == '__main__':
         print(f"First σ: {σs[0]}, Last σ: {σs[-1]}, N_σ: {N_σ}")
         print("##########")
 
-        for method in METHODS_IVP:
+        for method in methods:
 
             print(f"Solving with method: {method}")
             for N in Ns:
@@ -191,8 +298,9 @@ if __name__ == '__main__':
                 # Init
                 t1 = int(time.time())
                 print(f"Solving for N={N}...")
-                _data = data[method][N]
-                
+                _data = data[method][f"{N}"]
+                σs = σs_matrix[f"{method}"][f"{N}"]
+
                 for i, σ in enumerate(σs):
 
                     M1 = SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ, method)
@@ -217,7 +325,7 @@ if __name__ == '__main__':
                     file.write(json_data)
 
     if PLOT:
-        file_path = "Data_01_06_k.json"
+        file_path = "Data.json"
         plotData(file_path)
 
 # %%

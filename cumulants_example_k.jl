@@ -130,7 +130,7 @@ function plotData(file_path)
     end
 end
 
-if abspath(PROGRAM_FILE) == "/home/" || abspath(PROGRAM_FILE) == @__FILE__ 
+if abspath(PROGRAM_FILE) == @__FILE__ || @__FILE__ == "none"
 
     PLOT = false
     SOLVE = true
@@ -147,20 +147,20 @@ if abspath(PROGRAM_FILE) == "/home/" || abspath(PROGRAM_FILE) == @__FILE__
         σs = LinRange(1.8, 2., N_σ)
 
         # Writing parameters
-        data = OrderedDict(
-            "parameters" => OrderedDict()
+        data = Dict(
+            "parameters" => Dict()
             )
         for (name, alg) in METHODS_IVP
 
-            data[name] = OrderedDict(
-                N => OrderedDict(
+            data[name] = Dict(
+                N => Dict(
                     "points" => [],
                     "time" => 0,
                     "success" => [])
                 for N in Ns)
 
         end
-        data["parameters"] = OrderedDict(
+        data["parameters"] = Dict(
             "methods" => [methods[1] for methods in METHODS_IVP],
             "Ns" => Ns,
             "sigmas" => σs
