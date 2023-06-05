@@ -1,9 +1,11 @@
 # %%
 """
 Example of cumulant method as shown in "Dimension reduction of noisy interacting systems"
+Please see the paper to understand all the computations and parameteres
 By trying to solve the equation on the cumulants k_n  
+TODO: assert, join cumulants and moments
 """
-
+# Imports
 import numpy as np
 from math import factorial
 from scipy.optimize import root
@@ -13,7 +15,7 @@ import time
 import json
 import os
 
-# Explicit methods look really slow
+# Explicit methods look really slow so skip it
 METHODS_IVP = [  # "RK45",
     # "RK23",
     # "DOP853",
@@ -31,6 +33,7 @@ METHODS_ROOT = ["hybr",
                 "excitingmixing",
                 "krylov",
                 "df-sane"]
+
 ν = .5
 
 
@@ -42,17 +45,18 @@ def f(t, k, α, θ, σ_m, σ):
     # -----Init-----
     N = k.shape[0]
     _k = np.zeros(N+3)
-    _k[1:N+1] = k  # N.B: _k[0] is never used
+    _k[1:N+1] = k  # N.B: _k[0] is never used, it is only to start at n=1
 
     # Starts at n=1, so we will keep it that way
+    # First and second temrs are defined because of the kronecker symbol in the equations
     F = np.zeros(N)
     F[0] = θ*_k[1]
-    F[1] = σ**2  # it is not sigma² / 2 because we multiply by n=2
+    F[1] = σ**2
 
     # -----Definition of f-----
     """
     To define f, a sum from 1 to n-1 which contains the three sums will be computed
-    Then the last terms of the sum are added
+    Then the last terms of the other sums are added
     And we suppose B.C.: k_{N+1} = k_{N+2} = 0
     """
     for n in range(1, N+1):
@@ -114,8 +118,9 @@ def SolveCumulant_Stationnary(N, α, θ, σ_m, σ):
 
 def plotData(file_path):
     """
-    File must be the same format as Data.json created
+    File must be the same format as Data.json created in the checkFile function
     """
+    # Opening file to retrieve data
     with open(file_path, "r") as file:
         data = json.load(file)
 
@@ -137,7 +142,7 @@ def plotData(file_path):
         plt.ylabel("m")
         plt.legend()
         plt.title(f"Mean with cumulant solving ODE with method '{method}'")
-        plt.savefig(f"Figs/{method}.png")
+        plt.savefig(f"Figs/Cumulants_{method}.png")
         plt.show()
         plt.close()
 
@@ -145,33 +150,28 @@ def plotData(file_path):
 def checkFile(file_name, methods, Ns, σs, α, θ, σ_m):
     """
     This checks if the data file already exists.
-    It will search locally for a Data/data_parameters.json file and create
+    It will search locally for a Data/file_name.json file and create
     folders and file if they don't exist
 
     If file already exists, checks which methods, N and sigmas have been done
     and update the file with new parameters
 
-    Also returns a list of sigma to be computed, according to those which have already been done
-    and the new sigmas
+    Returns methods, Ns and a matrix of sigma to be computed, 
+    according to those which have already been done and the new sigmas
+
+    N.B.: If the sigmas are updated, the computation will be for all the Ns (new and already done) for consistency
     """
+
+    # If directory does not exist, create it
     if not os.path.exists("./Data"):
         os.mkdir("./Data")
 
     file_path = f"./Data/{file_name}"
     if not os.path.isfile(file_path):
-        # If there is no file, create it with the parameters
+        # If there is no file, create it and set parameters in it
+
         # Writing parameters
-        data = {
-            "parameters": {}
-        }
-        for method in methods:
-            data[f"{method}"] = {
-                N: {
-                    "points": [],
-                    "time": 0,
-                    "success": []
-                }
-                for N in Ns}
+        data = {}
         data["parameters"] = {
             "methods": methods,
             "Ns": Ns,
@@ -180,17 +180,32 @@ def checkFile(file_name, methods, Ns, σs, α, θ, σ_m):
             "theta": θ,
             "sigma_m": σ_m,
         }
-        json_dic = json.dumps(data, indent=4)
-        with open(file_path, "w") as file:
-            file.write(json_dic)
 
+        for method in methods:
+            data[f"{method}"] = {
+                f"{N}": {
+                    "points": [],
+                    "time": 0,
+                    "success": []
+                }
+                for N in Ns}
+
+        with open(file_path, "w") as file:
+            json.dump(data, file, indent=4)
+
+        # This matrix will contain the sigmas that have to be computed
+        # after checking which ones have already been computed
+        # Here the file was not created, so no sigma could have been computed
         σs_matrix = {}
+
         for method in methods:
             σs_matrix[f"{method}"] = {}
-            for N in Ns:
-                σs_matrix[f"{N}"] = σs
+            σs_matrix_method = σs_matrix[f"{method}"]
 
-        return methods, Ns, σs, σs_matrix
+            for N in Ns:
+                σs_matrix_method[f"{N}"] = σs
+
+        return methods, Ns, σs_matrix
 
     else:
         # If the file exists, check the Ns, sigmas and methods
@@ -204,9 +219,7 @@ def checkFile(file_name, methods, Ns, σs, α, θ, σ_m):
         # Values in sigmas but not in _sigmas
         new_σs = np.setdiff1d(σs, _σs).tolist()
         Ns_union = np.union1d(Ns, _Ns).tolist()
-        print(Ns, _Ns, Ns_union)
         methods_union = np.union1d(methods, _methods).tolist()
-        σs_matrix = {}
 
         # Updating file with new parameters
         param["Ns"] = Ns_union
@@ -215,31 +228,36 @@ def checkFile(file_name, methods, Ns, σs, α, θ, σ_m):
 
         """
         For now: data points for a model are writen only if all the sigmas are done
-        So we can check either if the lis "points" is empty or not
+        So we can check either if the list "points" is empty or not
         If empty: all the sigmas must be done
         If not empty: only the new sigmas
         TODO: write on the file sigma per sigma?
         """
+
+        # This matrix will contain the sigmas that have to be computed
+        # after checking which ones have already been computed
+        σs_matrix = {}
+
         for method in methods_union:
             σs_matrix[f"{method}"] = {}
             σs_matrix_method = σs_matrix[f"{method}"]
 
-            if method not in _methods:
+            if method not in _methods:  # i.e. not defined in the file
                 data[f"{method}"] = {}
 
             data_method = data[f"{method}"]
 
             for N in Ns_union:
-                str_N = str(N)
+                str_N = f"{N}"
 
-                if str_N not in data_method.keys():
+                if str_N not in data_method.keys():  # i.e. not defined in the file
                     data_method[str_N] = {
                         "points": [],
                         "time": 0,
                         "success": []
                     }
 
-                if str_N not in data_method.keys() or len(data_method[str_N]["points"]) == 0:
+                if len(data_method[str_N]["points"]) == 0:
                     # Case where N was not defined or was not done
                     σs_matrix_method[str_N] = σs_union
 
@@ -247,36 +265,48 @@ def checkFile(file_name, methods, Ns, σs, α, θ, σ_m):
                     # Else, only take the new sigmas
                     σs_matrix_method[str_N] = new_σs
 
-        with open(file_path, "w") as f:
-            json.dump(data, f, indent=4)
+        with open(file_path, "w") as file:
+            json.dump(data, file, indent=4)
 
-        return methods_union, Ns_union, σs_union, σs_matrix
+        return methods_union, Ns_union, σs_matrix
 
 
 # %%
 if __name__ == '__main__':
+    """
+    This script is to solve the differential equations of the cumulants k_n
+    for a dimension reduction of N.
 
+    Please note: for the data writing of the points, the values are automatically
+    sorted by decreasing order. It is not inconvenient as the function is supposed to be 
+    deacreasing according to sigma, but one has to remember it. 
+    """
+
+
+    # Parameters
     PLOT = False
     SOLVE = True
+    FAIL_LIMIT = 3
 
     if SOLVE:
         # -----Init-----
-        Ns = [4, 8]  # , 16, 24]
+        Ns = [4, 8, 16, 24]
         α = 1
         θ = 4
         σ_m = .8
-        N_σ = 30
+        N_σ = 2
         σ_start, σ_end = 1.8, 2.
         σs = np.linspace(1.8, 2., N_σ)
-        FILE_NAME = f"Data.json"
-        methods, Ns, σs, σs_matrix = checkFile(FILE_NAME,
-                                               METHODS_IVP,
-                                               Ns,
-                                               σs,
-                                               α,
-                                               θ,
-                                               σ_m)
-        print(methods, Ns, σs_matrix)
+
+        FILE_NAME = f"Data_k_alpha{α}_theta{θ}_sigma_m{σ_m}.json"
+
+        methods, Ns, σs_matrix = checkFile(FILE_NAME,
+                                           METHODS_IVP,
+                                           Ns,
+                                           σs,
+                                           α,
+                                           θ,
+                                           σ_m)
         with open(f"./Data/{FILE_NAME}", "r") as file:
             data = json.load(file)
 
@@ -300,32 +330,43 @@ if __name__ == '__main__':
                 print(f"Solving for N={N}...")
                 _data = data[method][f"{N}"]
                 σs = σs_matrix[f"{method}"][f"{N}"]
+                FAIL_COUNT = 0
 
                 for i, σ in enumerate(σs):
 
-                    M1 = SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ, method)
-                    _data["success"].append(M1.success)
+                    if FAIL_COUNT < FAIL_LIMIT:
+                        M1 = SolveCumulant_ODE(
+                            N, t0, t_end, α, θ, σ_m, σ, method)
+                        _data["success"].append(M1.success)
 
-                    if M1.success:
-                        _data["points"].append(M1.y[0, -1])
+                        if M1.success:
+                            _data["points"].append(M1.y[0, -1])
+                            FAIL_COUNT = 0
+                        else:
+                            _data["points"].append(0)
+                            print(f"N={N}, σ={σ}, method={method} failed")
+                            FAIL_COUNT += 1
+
                     else:
+                        _data["success"].append(False)
                         _data["points"].append(0)
-                        print(f"N={N}, σ={σ}, method={method} failed")
+                        if FAIL_COUNT == FAIL_LIMIT:
+                            print(f"Too much failure for N={N}, method={method} so skiping the value {N}")
+                            FAIL_COUNT += 1
 
                     # M1 = SolveCumulant_Stationnary(N, α, θ, σ_m, σ)
                     # M1s.append(M1.x[0])
 
                 # Time
                 t2 = int(time.time())
-                _data["time"] = t2-t1
+                _data["time"] += t2-t1
 
                 # Writing data
-                json_data = json.dumps(data, indent=4)
-                with open(FILE_NAME, "w") as file:
-                    file.write(json_data)
+                with open(f"./Data/{FILE_NAME}", "w") as file:
+                    json.dump(data, file, indent=4)
 
     if PLOT:
-        file_path = "Data.json"
+        file_path = "./Data/Data~.json"
         plotData(file_path)
 
 # %%
