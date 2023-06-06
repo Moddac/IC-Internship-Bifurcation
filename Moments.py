@@ -110,11 +110,19 @@ def SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ, method, mean=1, std=1):
     M0 = [norm.moment(n, loc=mean, scale=std) for n in range(1, N+1)]
 
     # -----Solver-----
+    T = int(time.time()) - 1
+
+    def stop_time(t, y, α, θ, σ_m, σ): 
+        τ = (int(time.time()) - T)
+        return int(τ < 60)
+    
+    stop_time.terminal = True
+    # stop_time.direction = +1
+
     M = solve_ivp(f, (t0, t_end), M0,
-                  args=(α, θ, σ_m, σ), method=method)
+                  args=(α, θ, σ_m, σ), method=method, events=stop_time)
 
     return M
-
 
 def SolveMoment_Stationnary(N, α, θ, σ_m, σ):
     """
@@ -309,7 +317,7 @@ if __name__ == '__main__':
     α = 1
     θ = 4
     σ_m = .8
-    N_σ = 4
+    N_σ = 150
     σs = np.linspace(1.8, 2., N_σ)
     FILE_NAME = f"Data_M_alpha{α}_theta{θ}_sigma_m{σ_m}.json"
 
@@ -349,21 +357,24 @@ if __name__ == '__main__':
 
                 if FAIL_COUNT < FAIL_LIMIT:
                     M1 = SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ, method)
-                    _data["success"].append(M1.success)
+                    success = (M1.status == 0) # Using the status to see if event stopped solving 
+                    _data["success"].append(success)
 
-                    if M1.success:
+                    if success:
                         _data["points"].append(M1.y[0, -1])
+                        FAIL_COUNT = 0
                     else:
                         _data["points"].append(0)
                         print(f"N={N}, σ={σ}, method={method} failed")
+                        FAIL_COUNT += 1 
 
                 else:
-                    data["success"].append(False)
+                    _data["success"].append(False)
                     _data["points"].append(0)
                     if FAIL_COUNT == FAIL_LIMIT:
                         print(
                             f"Too much failure for N={N}, method={method} so skiping the value {N}")
-                    FAIL_COUNT += 1
+                        FAIL_COUNT += 1
 
                 # M1 = SolveMoment_Stationnary(N, α, θ, σ_m, σ)
                 # M1s.append(M1.x[0])
