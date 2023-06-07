@@ -14,6 +14,7 @@ import json
 import os
 import pickle
 from scipy.stats import norm
+from FileHandler_DimReduction import checkFile
 
 # Parsing arguments
 import argparse
@@ -21,17 +22,17 @@ parser = argparse.ArgumentParser(description="Solve the IVP with dimension reduc
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 group = parser.add_mutually_exclusive_group(required=True)
 parser.add_argument("--scheme", required=True, help="scheme used for solving", choices=["cumulant", "moment"])
-parser.add_argument("--alpha", required=True, help="alpha parameter", type=float, metavar="")
-parser.add_argument("--theta", required=True, help="theta paramter", type=float, metavar="")
-parser.add_argument("--sigma_m", required=True, help="sigma_m parameter", type=float, metavar="")
-parser.add_argument("--sigma_start", required=True, help="Starting point of sigmas", type=float, metavar="")
-parser.add_argument("--sigma_end", required=True, help="Ending point of sigmas", type=float, metavar="")
-parser.add_argument("--N", required=True, help="N parameters. Write each one wanted", nargs="+", type=int, metavar="N")
-group.add_argument("--N_sigma", help="Number of sigmas between sigma_start and simga_end", type=int, metavar="")
-group.add_argument("--space_sigma", help="Space between 2 sigma points", type=float, metavar="")
-parser.add_argument("--fail_limit", help="Number of consecutive fails allowed before skipping a value of N", default=3, type=int, metavar="")
-parser.add_argument("--path", help="Path of the directory to save data", default="./Data", metavar="")
-parser.add_argument("-n", "--name", help="Name of the json file. Parameters are replaced by their values in default name.", default="Data_scheme_alpha_theta_sigma_m.json", metavar="")
+parser.add_argument("--alpha", required=True, help="alpha parameter", type=float)
+parser.add_argument("--theta", required=True, help="theta paramter", type=float)
+parser.add_argument("--sigma_m", required=True, help="sigma_m parameter", type=float)
+parser.add_argument("--sigma_start", required=True, help="Starting point of sigmas", type=float)
+parser.add_argument("--sigma_end", required=True, help="Ending point of sigmas", type=float)
+group.add_argument("--N_sigma", help="Number of sigmas between sigma_start and simga_end", type=int)
+parser.add_argument("--N", help="N parameters. Write each one wanted", nargs="*", type=int, metavar="N")
+group.add_argument("--space_sigma", help="Space between 2 sigma points", type=float)
+parser.add_argument("--fail_limit", help="Number of consecutive fails allowed before skipping a value of N", default=3, type=int)
+parser.add_argument("--path", help="Path of the directory to save data", default="./Data")
+parser.add_argument("-n", "--name", help="Name of the json file. Parameters are replaced by their values in default name.", default="Data_scheme_alpha_theta_sigma_m.json")
 args = parser.parse_args()
 
 # Explicit methods look really slow so skip it
@@ -241,146 +242,6 @@ def SolveMoment_Stationnary(N, α, θ, σ_m, σ):
     # M1s.append(M1.x[0])
 
 
-def createFile(file_path, methods, Ns, σs, α, θ, σ_m):
-    """
-    Creates .json file if it doesn't exist, and initialize it
-    """
-    # Writing parameters
-    data = {}
-    data["parameters"] = {
-        "methods": methods,
-        "Ns": Ns,
-        "sigmas": list(σs),
-        "alpha": α,
-        "theta": θ,
-        "sigma_m": σ_m,
-    }
-
-    for method in methods:
-        data[f"{method}"] = {
-            f"{N}": {
-                "points": [],
-                "time": 0,
-                "success": []
-            }
-            for N in Ns}
-
-    with open(file_path, "w") as file:
-        json.dump(data, file, indent=4)
-
-    # This matrix will contain the sigmas that have to be computed
-    # after checking which ones have already been computed
-    # Here the file was not created, so no sigma could have been computed
-    σs_matrix = {}
-
-    for method in methods:
-        σs_matrix[f"{method}"] = {}
-        σs_matrix_method = σs_matrix[f"{method}"]
-
-        for N in Ns:
-            σs_matrix_method[f"{N}"] = σs
-
-    return methods, Ns, σs_matrix
-
-
-def updateFile(file_path, methods, Ns, σs, α, θ, σ_m):
-    """
-    Update existing .json file with the new parameters
-    """
-    # If the file exists, check the Ns, sigmas and methods
-    with open(file_path, "r") as file:
-        data = json.load(file)
-    param = data["parameters"]
-
-    # Checking if same hyper parameters
-    _α, _θ, _σ_m = param["alpha"], param["theta"], param["sigma_m"]
-    assert (_α, _θ, _σ_m) == (
-        α, θ, σ_m), f"File with same name exist, but hyper parameters not the same. Please check values in file at {file_path}"
-
-    _methods, _Ns, _σs = param["methods"], param["Ns"], param["sigmas"]
-
-    σs_union = np.union1d(σs, _σs).tolist()
-    # Values in sigmas but not in _sigmas
-    new_σs = np.setdiff1d(σs, _σs).tolist()
-    Ns_union = np.union1d(Ns, _Ns).tolist()
-    methods_union = np.union1d(methods, _methods).tolist()
-
-    # Updating file with new parameters
-    param["Ns"] = Ns_union
-    param["methods"] = methods_union
-    param["sigmas"] = σs_union
-
-    """
-    For now: data points for a model are writen only if all the sigmas are done
-    So we can check either if the list "points" is empty or not
-    If empty: all the sigmas must be done
-    If not empty: only the new sigmas
-    TODO: write on the file sigma per sigma?
-    """
-
-    # This matrix will contain the sigmas that have to be computed
-    # after checking which ones have already been computed
-    σs_matrix = {}
-
-    for method in methods_union:
-        σs_matrix[f"{method}"] = {}
-        σs_matrix_method = σs_matrix[f"{method}"]
-
-        if method not in _methods:  # i.e. not defined in the file
-            data[f"{method}"] = {}
-
-        data_method = data[f"{method}"]
-
-        for N in Ns_union:
-            str_N = f"{N}"
-
-            if str_N not in data_method.keys():  # i.e. not defined in the file
-                data_method[str_N] = {
-                    "points": [],
-                    "time": 0,
-                    "success": []
-                }
-
-            if len(data_method[str_N]["points"]) == 0:
-                # Case where N was not defined or was not done
-                σs_matrix_method[str_N] = σs_union
-
-            else:
-                # Else, only take the new sigmas
-                σs_matrix_method[str_N] = new_σs
-
-    with open(file_path, "w") as file:
-        json.dump(data, file, indent=4)
-
-    return methods_union, Ns_union, σs_matrix
-
-
-def checkFile(file_path, methods, Ns, σs, α, θ, σ_m):
-    """
-    This checks if the data file already exists.
-    It will search locally for a Data/file_name.json file and create
-    folders and file if they don't exist
-
-    If file already exists, checks which methods, N and sigmas have been done
-    and update the file with new parameters
-
-    Returns methods, Ns and a matrix of sigma to be computed, 
-    according to those which have already been done and the new sigmas
-
-    N.B.: If the sigmas are updated, the computation will be for all the Ns (new and already done) for consistency
-    """
-
-    if not os.path.isfile(file_path):
-        # If there is no file, create it and set parameters in it
-
-        return createFile(file_path, methods, Ns, σs, α, θ, σ_m)
-
-    else:
-        # If there is a file update it with new parameters
-
-        return updateFile(file_path, methods, Ns, σs, α, θ, σ_m)
-
-
 # %%
 if __name__ == '__main__':
     """
@@ -406,7 +267,10 @@ if __name__ == '__main__':
     σ_m = args.sigma_m # .8
     N_σ = args.N_sigma
     space_σ = args.space_sigma
-    Ns = args.N
+    if args.N:
+        Ns = args.N
+    else:
+        Ns = []
     σ_start = args.sigma_start
     σ_end = args.sigma_end 
 
@@ -418,13 +282,13 @@ if __name__ == '__main__':
     solver = SolveCumulant_ODE if SCHEME == "cumulant" else SolveMoment_ODE
 
     # Creating or updating file
-    methods, Ns, σs_matrix = checkFile(FILE_PATH,
-                                       METHODS_IVP,
-                                       Ns,
-                                       σs,
-                                       α,
-                                       θ,
-                                       σ_m)
+    indx_matrix = checkFile(FILE_PATH,
+                            METHODS_IVP,
+                            Ns,
+                            σs,
+                            α,
+                            θ,
+                            σ_m)
     
     # Loading data from created or updated file
     with open(FILE_PATH, "r") as file:
@@ -436,6 +300,11 @@ if __name__ == '__main__':
 
 
     # -----Solving-----
+    # New parameters
+    param = data["parameters"]
+    methods, Ns, σs = param["methods"], param["Ns"], param["sigmas"]
+    σs = np.array(σs)
+
     print("##########")
     print("Parameters: ")
     print(f"Ns={Ns}")
@@ -451,28 +320,29 @@ if __name__ == '__main__':
             t1 = int(time.time())
             print(f"Solving for N={N}...")
             data_method = data[method][f"{N}"]
-            σs = σs_matrix[method][f"{N}"]
+            σs_N = σs[indx_matrix[method][f"{N}"]]
             FAIL_COUNT = 0
 
-            for i, σ in enumerate(σs):
-
+            for i, σ in enumerate(σs_N):
+                
+                indx = indx_matrix[method][f"{N}"][i]
                 if FAIL_COUNT < FAIL_LIMIT:
                     M1 = solver(N, t0, t_end, α, θ, σ_m, σ, method)
                     # Using the status to see if event stopped solving
                     success = (M1.status == 0)
-                    data_method["success"].append(success)
+                    data_method["success"].insert(indx, success)
 
                     if success:
-                        data_method["points"].append(M1.y[0, -1])
+                        data_method["points"].insert(indx, M1.y[0, -1])
                         FAIL_COUNT = 0
                     else:
-                        data_method["points"].append(0)
+                        data_method["points"].insert(indx, 0)
                         print(f"N={N}, σ={σ}, method={method} failed")
                         FAIL_COUNT += 1
 
                 else:
-                    data_method["success"].append(False)
-                    data_method["points"].append(0)
+                    data_method["success"].insert(indx, False)
+                    data_method["points"].insert(indx, 0)
                     if FAIL_COUNT == FAIL_LIMIT:
                         print(
                             f"Too much failure for N={N}, method={method} so skiping the value {N}")
