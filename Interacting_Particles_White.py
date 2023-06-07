@@ -16,25 +16,10 @@ def V(x):
 def dV(x):
     return x**3 - x
 
-############################################################################################
-#Finding critical values of beta and teta at wich bifurcation appears
-
 def ρ_st(x,m,β,θ):
     f = lambda y: np.exp(-β*(V(y)+.5*θ*(y-m)**2))
     Z = integrate.quad(f,-np.inf,np.inf)
     return f(x)/Z[0]
-
-def E_2(β,θ):
-    return integrate.quad(lambda x: x**2*ρ_st(x,0,β,θ),-np.inf,np.inf)[0]
-
-def θ_c(β):
-    return optimize.newton(lambda θ: 1 - θ*β*E_2(β,θ),x0=0)
-
-def β_c(θ):
-    return optimize.newton(lambda β: 1 - θ*β*E_2(β,θ),x0=0)
-
-############################################################################################
-
 
 def SDEsolve(N_p,N,dt,θ,β,X_0,plot=True):
     """
@@ -106,7 +91,7 @@ if __name__=='__main__':
     N = 10_000
     N_p = 1_000
     dt = 0.01
-    θ = 1
+    θ = 4
     X_0 = normal(0,np.sqrt(.1))
     # SDEsolve(N_p,N,dt,θ,β,X_0,True)
-    ms = bifurcation_scheme()
+    # ms = bifurcation_scheme()

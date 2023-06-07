@@ -69,7 +69,6 @@ def updateFile(file_path, methods, Ns, σs, α, θ, σ_m):
 
     # -----New parameters-----
     σs_union = np.union1d(σs, _σs).tolist()
-    print(σs_union)
     # Values in sigmas but not in _sigmas
     new_σs = np.setdiff1d(σs, _σs).tolist()
     Ns_union = np.union1d(Ns, _Ns).astype(int).tolist()

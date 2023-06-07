@@ -9,7 +9,6 @@ from matplotlib.animation import PillowWriter
 import scipy.integrate as integrate
 from Stochastic_Integral import SDEModel
 import time
-tim = time.time()
 
 def V(x):
     return x**4/4 - x**2/2
