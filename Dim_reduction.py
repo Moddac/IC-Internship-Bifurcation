@@ -261,7 +261,7 @@ if __name__ == '__main__':
         FILE_NAME = f"Data_{SCHEME}_{args.alpha}_{args.theta}_{args.sigma_m}.json"
     else:
         FILE_NAME = args.name 
-    FILE_PATH = f"./{args.path}/{FILE_NAME}"
+    FILE_PATH = f"{args.path}/{FILE_NAME}"
     α = args.alpha # 1
     θ = args.theta # 4
     σ_m = args.sigma_m # .8

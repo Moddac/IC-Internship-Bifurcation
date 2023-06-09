@@ -17,15 +17,15 @@ parser.add_argument("-n", "--name", help="Name of the file if fig is saved.", de
 args = parser.parse_args()
 
 if __name__=="__main__":
+    """
+    File must be the same format as Data.json created in the checkFile function
+    """
 
     # Checking file exists and creating directory if saving
     assert os.path.isfile(args.path), "File does not exist"
     if args.save_fig and not os.path.exists(args.path_save):
         os.mkdir(args.path_save)
-
-    """
-    File must be the same format as Data.json created in the checkFile function
-    """
+        
     # Opening file to retrieve data
     with open(args.path, "r") as file:
         data = json.load(file)
