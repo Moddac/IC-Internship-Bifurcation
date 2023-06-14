@@ -71,28 +71,28 @@ def get_η_H(N, dt):
     return np.matmul(y_η, Y)
 
 
-def plotSimulation(X, N):
-    # -----Plot-----
-    # -----Fig-----
-    fig1, ax1 = plt.subplots()
-    fig2, ax2 = plt.subplots()
-    fig3, ax3 = plt.subplots()
-    ax1.set_title("Histogram")
-    ax2.set_title("Mean")
-    writer1 = PillowWriter(fps=10)
-    writer2 = PillowWriter(fps=10)
+# def plotSimulation(X, N):
+#     # -----Plot-----
+#     # -----Fig-----
+#     fig1, ax1 = plt.subplots()
+#     fig2, ax2 = plt.subplots()
+#     fig3, ax3 = plt.subplots()
+#     ax1.set_title("Histogram")
+#     ax2.set_title("Mean")
+#     writer1 = PillowWriter(fps=10)
+#     writer2 = PillowWriter(fps=10)
 
-    with writer1.saving(fig1, f'histogram_β={β}_θ={θ}.gif', dpi=100):
-        with writer2.saving(fig2, f'mean_β={β}_θ={θ}.gif', dpi=100):
+#     with writer1.saving(fig1, f'histogram_β={β}_θ={θ}.gif', dpi=100):
+#         with writer2.saving(fig2, f'mean_β={β}_θ={θ}.gif', dpi=100):
 
-            for n in np.arange(0, N, 10):
-                ax1.clear()
-                ax2.clear()
-                _, bins, _ = ax1.hist(X[:, n+1], 100, density=True)
-                ax1.plot(bins, ρ_st_white(bins, np.mean(X[:, n]), β, θ))
-                ax2.plot(range(n+1), np.mean(X[:, :n+1], axis=0))
-                writer1.grab_frame()
-                writer2.grab_frame()
+#             for n in np.arange(0, N, 10):
+#                 ax1.clear()
+#                 ax2.clear()
+#                 _, bins, _ = ax1.hist(X[:, n+1], 100, density=True)
+#                 ax1.plot(bins, ρ_st_white(bins, np.mean(X[:, n]), β, θ))
+#                 ax2.plot(range(n+1), np.mean(X[:, :n+1], axis=0))
+#                 writer1.grab_frame()
+#                 writer2.grab_frame()
 
 
 def SDEsolve(N, N_p, dt, θ, β, X_0, N_space):

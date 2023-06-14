@@ -42,15 +42,15 @@ def R(m,D,τ,θ):
 
 def bifurcation_scheme():
     #PARAMETERS
-    θ = 1
+    θ = 4
     τ = 1
     Ds = np.linspace(.23,1,100)
-    βs = np.linspace(.5,5,200)
+    βs = np.linspace(1.0,4.0,50)
     ms = []
     for β in βs:
-        D = 2/β
+        D = np.sqrt(2/β)
         try:
-            m_st = optimize.fsolve(lambda m: m - R(m,D,τ,θ), x0=np.random.choice([-5*D,5*D]))
+            m_st = optimize.fsolve(lambda m: m - R(m,D,τ,θ), x0=np.random.choice([-D/2,D/2]))
         except RuntimeError:
             m_st = 0
         ms.append(m_st)

@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 
 Zs = {} #Dict used for keeping the integration constant in the memory
 
+"""
+For multiplicative noise
 def σ(x,_σ,σ_m):
     return np.sqrt(_σ**2 + (σ_m*x)**2)
 
@@ -25,7 +27,6 @@ def F_α(x,α):
 
 def F_hat_α(x,α,_σ,σ_m):
     return F_α(x,α) + σ(x,_σ,σ_m)*dσ(x,_σ,σ_m)/2
-
 def f_m(x,m,α,θ,_σ,σ_m):
     if σ_m==0:
         return f_m_det(x,m,α,_σ, σ_m)
@@ -54,10 +55,54 @@ def R_prime_zero(θ,α,_σ,σ_m):
 def σ_c(θ,α,σ_m):
     f = lambda _σ: R_prime_zero(θ,α,_σ,σ_m) - 1
     return optimize.root_scalar(f,bracket=[.5,2], x0=.5)
+"""
+def V(x):
+    return x**4/4 - x**2/2
+
+def dV(x):
+    return x**3 - x
+
+def d2V(x):
+    return 3*x**2 - 1
+
+def Φ(x,m,θ):
+    return V(x) + .5*θ*(x-m)**2
+
+def gradΦ(x,m,θ):
+    return dV(x) + θ*(x-m)
+
+def H(x,θ):
+    return d2V(x) + θ
+
+def f_m(x,m,D,τ,θ):
+    return 1/D*(Φ(x,m,θ) + τ/2*gradΦ(x,m,θ)**2)               
+
+def ρ_st(x,m,D,τ,θ):
+    if f'{m},{D},{τ},{θ}' not in Zs.keys():
+        Zs[f'{m},{D},{τ},{θ}'] = integrate.quad(lambda y: np.exp(-f_m(y,m,D,τ,θ))*np.abs(1 + τ*H(y,θ)),-np.inf,np.inf)[0]
+    Z = Zs[f'{m},{D},{τ},{θ}']
+    return np.exp(-f_m(x,m,D,τ,θ))*np.abs(1 + τ*H(x,θ))/Z
+
+def R(m,D,τ,θ):
+    return integrate.quad(lambda x: x*ρ_st(x,m,D,τ,θ), -np.inf, np.inf)[0]
+
+from scipy.misc import derivative
+def R_prime_zero(D,τ,θ):
+    return derivative(lambda m: R(m,D,τ,θ), 0)
+
+def σ_c(τ,θ):
+    f = lambda D: R_prime_zero(D,τ,θ) - 1
+    return optimize.root_scalar(f, x0=2)
 
 if __name__=='__main__':
     θ = 4
     α = 1
     σ_m = 0
+    τ = 1
+    D = 2.95**2
 
-    print(σ_c(θ,α,σ_m).root)
+    ms = np.linspace(-2,2,100)
+    Rs = [R(m,D,τ,θ) - m for m in ms]
+    plt.plot(ms,Rs)
+    plt.plot(ms, 0*ms)
+    plt.show()
