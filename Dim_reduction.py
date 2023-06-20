@@ -204,13 +204,17 @@ def f_moment_OU(t, u, α, θ, σ):
     See paper for equation
     """
     # -----Init-----
-    N = u.shape[0] - 3
+    N = u.shape[0] - 1
     M = np.zeros((N+3, 2))
+    if t==0:
+        E_ηt = 0
+        E_ηtηt = 0
+    else:
+        E_ηt = norm.moment(1, loc=0, scale=np.sqrt(1-np.exp(-2*t)))
+        E_ηtηt = norm.moment(2, loc=0, scale=np.sqrt(1-np.exp(-2*t)))
     M[0,0] = 1
     M[1,1] = u[N] # X_t * η_t
-    M[0,1] = u[N+1]  # η_t 
-    E_ηt = u[N+1]
-    E_ηtηt = u[N+2] # η_t**2
+    M[0,1] = E_ηt
     M[1:N+1, 0] = u[:N]
     for n in range(2, N+1):
         M[n,1] = np.sum([
@@ -223,7 +227,7 @@ def f_moment_OU(t, u, α, θ, σ):
     mn1 = pickle.load(fN1)
     mn2 = pickle.load(fN2)
     fN1.close(); fN2.close()
-    for p in range(2):
+    for p in range(1):
         M[N+1, p] = mn1(np.reshape(M[1:N+1, p], (1, N)))
         M[N+2, p] = mn2(np.reshape(M[1:N+1, p], (1, N)))
 
@@ -245,7 +249,7 @@ def f_moment_OU(t, u, α, θ, σ):
     #     - Σ2
     # )
 
-    F = np.zeros(N+3)
+    F = np.zeros(N+1)
 
     # -----Definition of f-----
     """
@@ -266,10 +270,75 @@ def f_moment_OU(t, u, α, θ, σ):
             + σ*E_ηtηt \
             - M[1,1]
         )
-    F[N+1] = -E_ηt
-    F[N+2] = -2*E_ηtηt + 2
         
     return F
+
+def f_moment_OU_(t, u, α, θ, σ, N, P):
+    """
+    This is the function to solve dM/dt = f(M,t) for a OU noise 
+    See paper for equation
+    """
+    # -----Init-----
+    u = u.reshape((N,P+1))
+    M = np.zeros((N+3, P+2))
+    if t!=0.:
+        M[0, :P+1] = np.array([norm.moment(p, loc=0, scale=np.sqrt(1-np.exp(-2*t))) for p in range(P+1)])
+
+    M[1:N+1, :P+1] = u
+
+    # Loading bell functions
+    fN1 = open('./functions/formula_mn1_'+str(N), "rb")
+    fN2 = open('./functions/formula_mn2_'+str(N), "rb")
+    mn1 = pickle.load(fN1)
+    mn2 = pickle.load(fN2)
+    fN1.close(); fN2.close()
+    for p in range(P+2):
+        M[N+1, p] = mn1(np.reshape(M[1:N+1, p], (1, N)))
+        M[N+2, p] = mn2(np.reshape(M[1:N+1, p], (1, N)))
+
+    # fP1 = open('./functions/formula_mn1_'+str(P), "rb")
+    # mp1 = pickle.load(fP1)
+    # fP1.close()
+    # for n in range(1, N+3):
+    #     M[n, P+1] = mp1(np.reshape(M[n, 1:P+1], (1, P)))
+    
+    # ######## WORKING BUT REALLY LONG
+    # Explicit formula
+    # BC_M1 = -np.sum([
+    #     (-1)**(l-1)*factorial(l-1)*bell(N+1, l, M)
+    #     for l in range(2, N+2)])
+
+    # Σ1 = np.sum([
+    #     comb(N+2, k)*_M[k]*_M[N+2-k]
+    #     for k in range(2, N+1)])
+    # Σ2 = np.sum([
+    #     (-1)**(l-1)*factorial(l-1)*bell(N+2, l, M)
+    #     for l in range(3, N+3)])
+    # BC_M2 = (
+    #     (N+2)*BC_M1*_M[1]
+    #     + .5*Σ1
+    #     - Σ2
+    # )
+
+    F = np.zeros((N, P+1))
+
+    # -----Definition of f-----
+    """
+    We suppose B.C. on M_{N+1} and M_{N+2} to be the ones in the paper 
+    """
+    # print(M, E_ηtηt)
+    for i in range(1, N+1):
+        for j in range(P+1):
+            F[i-1, j] = i*(
+                - M[i+2,j] \
+                - M[i,j]*(θ - α) \
+                + θ*M[1,0]*M[i-1,j] \
+                + σ*M[i-1,j+1]
+            ) \
+            - j*M[i,j] \
+            - j*(j-1)*M[i,j-2] if j>1 else 0
+        
+    return F.flatten()
 
 
 def SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ, method, mean=1, std=1, noise="white"):
@@ -300,8 +369,6 @@ def SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ, method, mean=1, std=1, noise
         # -----Init-----
         u0 = [norm.moment(n, loc=mean, scale=std) for n in range(1, N+1)]
         u0 += [0] # X_0 * η_0
-        u0 += [0] # η_0
-        u0 += [1] # η_0**2
         u0 = np.array(u0)
             
         # -----Solver-----
@@ -316,6 +383,28 @@ def SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ, method, mean=1, std=1, noise
                     args=(α, θ, σ), method=method, events=stop_time)
         print(u.y[:, -1])
 
+        return u
+    
+    if noise=="_OU":
+        # -----Init-----
+        P = 3
+        u0 = np.zeros((N,P+1))
+        u0[:, 0] = [norm.moment(n, loc=mean, scale=std) for n in range(1, N+1)] # X_0**n
+        u0 = u0.flatten()
+            
+        # -----Solver-----
+        T = int(time.time()) - 1
+
+        def stop_time(t, y, α, θ, σ, N, P):
+            τ = (int(time.time()) - T)
+            return int(τ < 60)
+        stop_time.terminal = True
+
+        u = solve_ivp(f_moment_OU_, (t0, t_end), u0,
+                    args=(α, θ, σ, N, P), method=method, events=stop_time)
+        print(u.y[:, -1])
+        u.y = u.y.reshape((N,P+1,u.y.shape[1]))[:,0,:]
+        print(u.y[0,-1])
         return u
 
 
@@ -429,7 +518,7 @@ if __name__ == '__main__':
                 indx = indx_matrix[method][f"{N}"][i]
                 if FAIL_COUNT < FAIL_LIMIT:
 
-                    M1 = solver(N, t0, t_end, α, θ, σ_m, σ, method, noise="OU")
+                    M1 = solver(N, t0, t_end, α, θ, σ_m, σ, method, noise="_OU")
                     # Using the status to see if event stopped solving
                     success = (M1.status == 0)
                     data_method["success"].insert(indx, success)

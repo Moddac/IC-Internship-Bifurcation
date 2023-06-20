@@ -8,6 +8,6 @@ python Dim_reduction.py\
 	--sigma_start 2.0\
 	--sigma_end 3.0\
 	--N_sigma 50\
-	--N 4 8 12 16\
-	--name "Test_OU.json"\
+	--N 4 8\
+	--name "Test_OU_matrix.json"\
 	--delete_file
