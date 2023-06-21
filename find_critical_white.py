@@ -101,11 +101,11 @@ def σ_c(θ, α, σ_m, σ_before, σ_after):
 
 
 if __name__ == '__main__':
-    θ = 4
+    θ = 6
     α = 1
-    σ_m = 1.
-    σ_start = 1.7
+    σ_m = 0
+    σ_start = 1.9
     σ_end = 2.2
 
-    plotSelfConsistency(θ, α, σ_m, σ_start, σ_end)
+    # plotSelfConsistency(θ, α, σ_m, σ_start, σ_end)
     print(σ_c(θ, α, σ_m, σ_start, σ_end))
