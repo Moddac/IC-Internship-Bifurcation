@@ -5,9 +5,10 @@ python Dim_reduction.py\
 	--alpha 1\
 	--theta 4\
 	--sigma_m 0.8\
-	--sigma_start 2.0\
-	--sigma_end 3.0\
+	--sigma_start 1.5\
+	--sigma_end 2.0\
 	--N_sigma 50\
 	--N 4 8\
-	--name "Test_OU_matrix.json"\
-	--delete_file
+	--name "Test_OU_epsilon.json"\
+	--delete_file\
+	--epsilon 0.1

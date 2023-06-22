@@ -31,6 +31,7 @@ parser.add_argument("--sigma_end", required=True, help="Ending point of sigmas",
 group.add_argument("--N_sigma", help="Number of sigmas between sigma_start and simga_end", type=int)
 parser.add_argument("--N", help="N parameters. Write each one wanted", nargs="*", type=int, metavar="N")
 group.add_argument("--space_sigma", help="Space between 2 sigma points", type=float)
+parser.add_argument("--epsilon", help="Epsilon parameter for OU noise", default=1., type=float)
 parser.add_argument("--fail_limit", help="Number of consecutive fails allowed before skipping a value of N", default=3, type=int)
 parser.add_argument("--path", help="Path of the directory to save data", default="./Data_DimReduction")
 parser.add_argument("-n", "--name", help="Name of the json file. Parameters are replaced by their values in default name.", default="Data_scheme_alpha_theta_sigma_m.json")
@@ -180,7 +181,7 @@ def f_moment(t, M, α, θ, σ_m, σ):
         )
     return F
 
-def f_moment_OU(t, u, α, θ, σ):
+def f_moment_OU(t, u, α, θ, σ, ε):
     """
     This is the function to solve dM/dt = f(M,t) for a OU noise 
     See paper for equation
@@ -224,20 +225,20 @@ def f_moment_OU(t, u, α, θ, σ):
             - M[i+2,0] \
             - M[i,0]*(θ - α) \
             + θ*M[1,0]*M[i-1,0] \
-            + σ*M[i-1,1]
+            + ζ*σ*M[i-1,1] / ε
         )
     F[N] = (
             - M[3,1] \
             - M[1,1]*(θ - α) \
             + θ*M[1,0]*M[0,1] \
-            + σ*E_ηtηt \
-            - M[1,1]
+            + ζ*σ*E_ηtηt / ε \
+            - M[1,1] / ε**2
         )
         
     return F
 
 
-def SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ, method, mean=1, std=1, noise="white"):
+def SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ, ε, method, mean=1, std=1, noise="white"):
     """
     Solving the cumulant ODE for 1 set of parameters
     Initial condition is a gaussian
@@ -270,13 +271,13 @@ def SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ, method, mean=1, std=1, noise
         # -----Solver-----
         T = int(time.time()) - 1
 
-        def stop_time(t, y, α, θ, σ):
+        def stop_time(t, y, α, θ, σ, ε):
             τ = (int(time.time()) - T)
-            return int(τ < 60)
+            return int(τ < 300)
         stop_time.terminal = True
 
         u = solve_ivp(f_moment_OU, (t0, t_end), u0,
-                    args=(α, θ, σ), method=method, events=stop_time)
+                    args=(α, θ, σ, ε), method=method, events=stop_time)
         print(u.y[:, -1])
 
         return u
@@ -339,6 +340,8 @@ if __name__ == '__main__':
         Ns = []
     σ_start = args.sigma_start
     σ_end = args.sigma_end 
+    ε = args.epsilon
+    ζ = 1 / np.sqrt(2)
 
     if args.N_sigma:
         σs = np.linspace(σ_start, σ_end, N_σ)
@@ -363,6 +366,7 @@ if __name__ == '__main__':
     t0 = 0
     t_end = 10e6
 
+    ####################################################################################
     # -----Solving-----
     # New parameters
     param = data["parameters"]
@@ -392,7 +396,7 @@ if __name__ == '__main__':
                 indx = indx_matrix[method][f"{N}"][i]
                 if FAIL_COUNT < FAIL_LIMIT:
 
-                    M1 = solver(N, t0, t_end, α, θ, σ_m, σ, method, noise="_OU")
+                    M1 = solver(N, t0, t_end, α, θ, σ_m, σ, ε, method, noise="OU")
                     # Using the status to see if event stopped solving
                     success = (M1.status == 0)
                     data_method["success"].insert(indx, success)

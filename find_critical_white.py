@@ -101,7 +101,7 @@ def σ_c(θ, α, σ_m, σ_before, σ_after):
 
 
 if __name__ == '__main__':
-    θ = 6
+    θ = 4
     α = 1
     σ_m = 0
     σ_start = 1.9
