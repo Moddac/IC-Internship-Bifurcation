@@ -87,13 +87,15 @@ def D_c(τ, θ, α, σ_before, σ_after):
     return root.root
 
 if __name__ == '__main__':
-
-    ε = 0.01
+    """
+    Important: don't forget the factor ζ which makes data generated before a different  
+    """ 
+    ε = 1
     θ = 4
     α = 1
     τ = ε**2
     σ_start = 1.
-    σ_end = 10e10
+    σ_end = 10e5
 
     # plotSelfConsistency(τ, θ, α, σ_start, σ_end)
     print(np.sqrt(2*D_c(τ, θ, α, σ_start, σ_end)))

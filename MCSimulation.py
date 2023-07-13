@@ -145,9 +145,6 @@ def SDEsolve(N, N_p, dt, θ, β, X_0, N_space):
             η_old = η
             η = np.matmul(y_η, Z)
             η_new = η
-            print(np.matmul(η_old, η_new))
-            print(np.exp(-dt/2)*(np.cos(np.sqrt(3)/2 * dt) + np.sqrt(3)/3*np.sin(np.sqrt(3)/2 * dt)))
-            print("############")
 
         Y = Y + µ(Y)*dt + σ(Y)*η*dt
     
