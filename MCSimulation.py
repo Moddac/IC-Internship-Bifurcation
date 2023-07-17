@@ -4,8 +4,6 @@ Attempt to solve interacting particle SDE with Euler-Maruyama shceme for differe
 
 import numpy as np
 from numpy.random import normal
-import matplotlib.pyplot as plt
-from matplotlib.animation import PillowWriter
 import scipy.integrate as integrate
 from FileHandler_MCMC import checkFile
 import json
@@ -19,6 +17,7 @@ parser.add_argument("--N", required=True, help="Number of step for the simulatio
 parser.add_argument("--N_p", required=True, help="Number of particles", type=int)
 parser.add_argument("--dt", help="Time space between two steps", default=0.01, type=float)
 parser.add_argument("--theta", required=True, help="Theta paramter", type=float)
+parser.add_argument("--gamma", help="Parameter for intertia. If 0 then no inertia and classic IPS", default=0., type=float)
 parser.add_argument("--beta_start", required=True, help="Starting point of betas", type=float)
 parser.add_argument("--beta_end", required=True, help="Ending point of betas", type=float)
 group = parser.add_mutually_exclusive_group(required=True)
@@ -38,64 +37,7 @@ def dV(x):
     return x**3 - x
 
 
-def ρ_st_white(x, m, β, θ):
-    def f(y): return np.exp(-β*(V(y)+.5*θ*(y-m)**2))
-    Z = integrate.quad(f, -np.inf, np.inf)
-    return f(x)/Z[0]
-
-
-def get_η_OU(N, N_p, dt):
-    # -----Init-----
-    Y = np.zeros((N_p, N))
-
-    # -----Solving-----
-    for n in range(N-1):
-        Y[:, n+1] = Y[:, n] - Y[:, n]*dt + np.sqrt(2)*normal(0, np.sqrt(dt), N_p)
-
-    return Y
-
-def get_η_H(N, dt):
-    Y = np.zeros((2, N+1))
-    γ = 1
-    A = np.array([[0, 1],
-                  [-1, -γ]])
-    D = np.array([[0, 0],
-                  [0, np.sqrt(γ)]])
-    y_η = np.array([1, 0])
-
-    # -----Solving SDE-----
-    for n in range(N):
-        Y[:, n+1] = Y[:, n] + np.matmul(A, Y[:, n])*dt + \
-            np.sqrt(2)*np.matmul(D, normal(0, np.sqrt(dt), 2))
-
-    return np.matmul(y_η, Y)
-
-
-# def plotSimulation(X, N):
-#     # -----Plot-----
-#     # -----Fig-----
-#     fig1, ax1 = plt.subplots()
-#     fig2, ax2 = plt.subplots()
-#     fig3, ax3 = plt.subplots()
-#     ax1.set_title("Histogram")
-#     ax2.set_title("Mean")
-#     writer1 = PillowWriter(fps=10)
-#     writer2 = PillowWriter(fps=10)
-
-#     with writer1.saving(fig1, f'histogram_β={β}_θ={θ}.gif', dpi=100):
-#         with writer2.saving(fig2, f'mean_β={β}_θ={θ}.gif', dpi=100):
-
-#             for n in np.arange(0, N, 10):
-#                 ax1.clear()
-#                 ax2.clear()
-#                 _, bins, _ = ax1.hist(X[:, n+1], 100, density=True)
-#                 ax1.plot(bins, ρ_st_white(bins, np.mean(X[:, n]), β, θ))
-#                 ax2.plot(range(n+1), np.mean(X[:, :n+1], axis=0))
-#                 writer1.grab_frame()
-#                 writer2.grab_frame()
-
-
-def SDEsolve(N, N_p, dt, θ, β, X_0, N_space):
+def SDEsolve(N, N_p, dt, θ, γ, β, X_0, N_space):
     """
     Solving the SDE of interacting particles
     N_p: number of particles
@@ -105,6 +47,8 @@ def SDEsolve(N, N_p, dt, θ, β, X_0, N_space):
     """
     # -----Init-----
     X = [] # X is used for storing data and Y to solve SDE. Important for memory issue otherwise
+
+    # Noise SDE
     if args.noise == "OU":
         η = np.zeros(N_p)
         def μ_OU(Y): return -Y
@@ -113,18 +57,25 @@ def SDEsolve(N, N_p, dt, θ, β, X_0, N_space):
     elif args.noise == "H":
         η = np.zeros(N_p)
         Z = np.zeros((2, N_p))
-        γ = 1
+        λ = 1
         A = np.array([[0, 1],
-                    [-1, -γ]])
+                    [-1, -λ]])
         D = np.array([[0, 0],
-                    [0, np.sqrt(γ)]])
+                    [0, np.sqrt(λ)]])
         y_η = np.array([1, 0])
 
         def μ_H(Z): return np.matmul(A, Z)
         def σ_H(Z): return np.sqrt(2)*D
 
+    # IPS SDE
     sqrt_dt = np.sqrt(dt)
-    Y = X_0
+    if γ==0.:
+        q = 0
+        Y = X_0
+    else:
+        q = X_0
+        Y = 0
+
     def μ(Y):
         return -(dV(Y) + θ*(Y - np.mean(Y)))
     def σ(Y):
@@ -134,7 +85,7 @@ def SDEsolve(N, N_p, dt, θ, β, X_0, N_space):
     for n in range(N):
         if n in N_space:
             # Saving every N_points
-            X.append([int(n*dt), np.mean(Y)])
+            X.append([int(n*dt), np.mean(q)])
 
         if args.noise == "white":
             η = normal(0, 1/np.sqrt(dt), N_p) # Equivalent of normal(0, np.sqrt(dt), N_p) when multiplied by dt
@@ -146,11 +97,15 @@ def SDEsolve(N, N_p, dt, θ, β, X_0, N_space):
             η = np.matmul(y_η, Z)
             η_new = η
 
-        Y = Y + µ(Y)*dt + σ(Y)*η*dt
-    
+        if γ==0.:
+            Y += µ(Y)*dt + σ(Y)*η*dt
+        else:
+            q += Y*dt
+            Y += µ(Y)*dt - γ*q + np.sqrt(γ)*σ(Y)*η*dt
+
     return X
 
-def bifurcation_scheme(file_path, N, N_p, dt, θ, βs):
+def bifurcation_scheme(file_path, N, N_p, dt, θ, γ, βs):
     """
     Creates the bifurcation scheme for coloured noise
     """
@@ -167,7 +122,7 @@ def bifurcation_scheme(file_path, N, N_p, dt, θ, βs):
     for β in βs:
         globals()["β"] = β
         X_0 = normal(0, np.sqrt(.1))
-        M1 = SDEsolve(N, N_p, dt, θ, β, X_0, N_space)
+        M1 = SDEsolve(N, N_p, dt, θ, γ, β, X_0, N_space)
 
         data["data_points"][f"{β}"] = M1
 
@@ -194,8 +149,8 @@ if __name__ == '__main__':
     N = args.N
     N_p = args.N_p
     dt = args.dt
-    global θ
     θ = args.theta
+    γ = args.gamma
     β_start = args.beta_start
     β_end = args.beta_end 
     N_β = args.N_beta
@@ -206,4 +161,4 @@ if __name__ == '__main__':
     elif args.space_beta:
         βs = np.arange(β_start, β_end, step_β)
 
-    bifurcation_scheme(FILE_PATH, N, N_p, dt, θ, βs)
+    bifurcation_scheme(FILE_PATH, N, N_p, dt, θ, γ, βs)
