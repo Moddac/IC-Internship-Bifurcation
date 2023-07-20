@@ -98,4 +98,6 @@ if __name__ == '__main__':
     σ_end = 10e5
 
     # plotSelfConsistency(τ, θ, α, σ_start, σ_end)
-    print(np.sqrt(2*D_c(τ, θ, α, σ_start, σ_end)))
+    σ_c = np.sqrt(2*D_c(τ, θ, α, σ_start, σ_end))
+    print(σ_c)
+    print(2/(σ_c**2))

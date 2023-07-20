@@ -23,6 +23,7 @@ parser.add_argument("--beta_end", required=True, help="Ending point of betas", t
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument("--N_beta", help="Number of beta between beta_start and beta_end", type=int)
 group.add_argument("--step_beta", help="Step size between 2 beta points", type=float)
+parser.add_argument("--epsilon", help="Epsilon parameter for OU noise", default=1., type=float)
 parser.add_argument("--noise", help="Type of noise", default="white", choices=["white", "OU", "H"])
 parser.add_argument("--path", help="Path of the directory to save data", default="./Data_MC")
 parser.add_argument("-n", "--name", help="Name of the json file. Parameters are replaced by their values in default name.", default="Data_MC_noise_N_N_p_dt_theta.json")
@@ -37,7 +38,7 @@ def dV(x):
     return x**3 - x
 
 
-def SDEsolve(N, N_p, dt, θ, γ, β, X_0, N_space):
+def SDEsolve(N, N_p, dt, θ, γ, ε, β, X_0, N_space, noise):
     """
     Solving the SDE of interacting particles
     N_p: number of particles
@@ -49,13 +50,15 @@ def SDEsolve(N, N_p, dt, θ, γ, β, X_0, N_space):
     X = [] # X is used for storing data and Y to solve SDE. Important for memory issue otherwise
 
     # Noise SDE
-    if args.noise == "OU":
+    if noise == "OU":
         η = np.zeros(N_p)
-        def μ_OU(Y): return -Y
-        def σ_OU(Y): return np.sqrt(2)
+        ζ = 1 / np.sqrt(2)
+        def μ_OU(Y): return -Y / (ε**2)
+        def σ_OU(Y): return np.sqrt(2)*ζ / (ε**2)
 
-    elif args.noise == "H":
+    elif noise == "H":
         η = np.zeros(N_p)
+        ζ = 1 / np.sqrt(2)
         Z = np.zeros((2, N_p))
         λ = 1
         A = np.array([[0, 1],
@@ -85,13 +88,18 @@ def SDEsolve(N, N_p, dt, θ, γ, β, X_0, N_space):
     for n in range(N):
         if n in N_space:
             # Saving every N_points
-            X.append([int(n*dt), np.mean(q)])
+            if γ==0.:
+                X.append([int(n*dt), np.mean(Y)])
+            else:
+                X.append([int(n*dt), np.mean(q)])
 
-        if args.noise == "white":
+
+
+        if noise == "white":
             η = normal(0, 1/np.sqrt(dt), N_p) # Equivalent of normal(0, np.sqrt(dt), N_p) when multiplied by dt
-        elif args.noise == "OU":
+        elif noise == "OU":
             η = η + μ_OU(η)*dt + σ_OU(η)*normal(0, sqrt_dt, N_p)
-        elif args.noise == "H":
+        elif noise == "H":
             Z += μ_H(Z)*dt + np.matmul(σ_H(Z), normal(0, np.sqrt(dt), (2, N_p)))
             η_old = η
             η = np.matmul(y_η, Z)
@@ -100,19 +108,20 @@ def SDEsolve(N, N_p, dt, θ, γ, β, X_0, N_space):
         if γ==0.:
             Y += µ(Y)*dt + σ(Y)*η*dt
         else:
-            q += Y*dt
-            Y += µ(Y)*dt - γ*q + np.sqrt(γ)*σ(Y)*η*dt
+            _q = q
+            q += γ*Y*dt 
+            Y += γ*µ(_q)*dt - γ**2*Y*dt + γ*σ(Y)*η*dt
 
     return X
 
-def bifurcation_scheme(file_path, N, N_p, dt, θ, γ, βs):
+def bifurcation_scheme(file_path, N, N_p, dt, θ, γ, ε, βs, noise):
     """
     Creates the bifurcation scheme for coloured noise
     """
     # -----Init-----
     N_points = 10
     N_space = np.linspace(0, N-1, N_points, dtype=int)
-    βs = checkFile(file_path, N, N_p, dt, θ, βs)
+    βs = checkFile(file_path, N, N_p, dt, θ, ε, βs)
     with open(file_path, "r") as file:
         data = json.load(file)
     
@@ -122,7 +131,7 @@ def bifurcation_scheme(file_path, N, N_p, dt, θ, γ, βs):
     for β in βs:
         globals()["β"] = β
         X_0 = normal(0, np.sqrt(.1))
-        M1 = SDEsolve(N, N_p, dt, θ, γ, β, X_0, N_space)
+        M1 = SDEsolve(N, N_p, dt, θ, γ, ε, β, X_0, N_space, noise)
 
         data["data_points"][f"{β}"] = M1
 
@@ -135,7 +144,7 @@ if __name__ == '__main__':
     # PARAMETERS
     print("Initialisation of the parameters...")
     if args.name == "Data_MC_noise_N_N_p_dt_theta.json":
-        FILE_NAME = f"Data_MC_{args.noise}_{args.N}_{args.N_p}_{args.dt}_{args.theta}.json"
+        FILE_NAME = f"Data_MC_{args.noise}_{args.N}_{args.N_p}_{args.dt}_{args.theta}_{args.epsilon}.json"
     else:
         FILE_NAME = args.name
     if not os.path.exists(args.path):
@@ -154,11 +163,13 @@ if __name__ == '__main__':
     β_start = args.beta_start
     β_end = args.beta_end 
     N_β = args.N_beta
+    ε = args.epsilon
     step_β = args.step_beta
+    noise = args.noise
 
     if args.N_beta:
         βs = np.linspace(β_start, β_end, N_β)
     elif args.space_beta:
         βs = np.arange(β_start, β_end, step_β)
 
-    bifurcation_scheme(FILE_PATH, N, N_p, dt, θ, γ, βs)
+    bifurcation_scheme(FILE_PATH, N, N_p, dt, θ, γ, ε, βs, noise)

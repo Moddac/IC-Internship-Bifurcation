@@ -50,17 +50,20 @@ parser.add_argument(
 parser.add_argument("-n", "--name", help="Name of the json file. Parameters are replaced by their values in default name.",
                     default="Data_scheme_alpha_theta_sigma_m.json")
 parser.add_argument("--delete_file", help="Delete data file if the name are the same. Warning: turning this option to true will delete the data file without checking anything, use at your own risk.", action="store_true")
+parser.add_argument("--stop_time", help="Time to stop the solver and consider a failure", type=float, default=300)
 args = parser.parse_args()
 
 
 # HYPER PARAMETERS
 # Explicit methods look really slow so skip it
-METHODS_IVP = [  # "RK45",
+METHODS_IVP = [
+    # "RK45",
     # "RK23",
     # "DOP853",
-    # "Radau"]#,
-    "BDF"]
-    # "LSODA"]
+    # "Radau",
+    "BDF",
+    # "LSODA"
+    ]
 METHODS_ROOT = ["hybr",
                 "lm",
                 "broyden1",
@@ -72,8 +75,8 @@ METHODS_ROOT = ["hybr",
                 "krylov",
                 "df-sane"]
 ν = .5
-STOP_TIME = 60
-P = 8
+STOP_TIME = args.stop_time
+P = 4
 
 
 def f_cumulant(t, k, α, θ, σ_m, σ):
@@ -225,18 +228,12 @@ def f_moment_OU(t, u, α, θ, σ, ε):
     M[0, 1] = E_ηt
     M[1:N+1, 0] = u[:N]
     for n in range(2, N+1):
+        print(n)
         M[n, 1] = np.sum([
             comb(n, k)*M[1, 0]**(n-k)*Isserlis(k,
                                                (M[2, 0]-M[1, 0]**2), (M[1, 1]-M[1, 0]*M[0, 1]))
             for k in range(n+1)])
 
-    # Loading bell functions
-    fN1 = open('./functions/formula_mn1_'+str(N), "rb")
-    fN2 = open('./functions/formula_mn2_'+str(N), "rb")
-    mn1 = pickle.load(fN1)
-    mn2 = pickle.load(fN2)
-    fN1.close()
-    fN2.close()
     for p in range(1):
         M[N+1, p] = mn1(np.reshape(M[1:N+1, p], (1, N)))
         M[N+2, p] = mn2(np.reshape(M[1:N+1, p], (1, N)))
@@ -261,7 +258,7 @@ def f_moment_OU(t, u, α, θ, σ, ε):
         + ζ*σ*E_ηtηt / ε
         - M[1, 1] / ε**2
     )
-
+    
     return F
 
 
@@ -299,7 +296,6 @@ def SolveCumulant_ODE(N, t0, t_end, α, θ, σ_m, σ, ε, method, noise):
         κ = solve_ivp(f_cumulant_OU, (t0, t_end), κ0,
                       args=(α, θ, σ, ε), method=method, events=stop_time)
         
-        print(κ.y[1, -1])
         return κ.y[1, -1], (κ.status==0)
     
 
@@ -308,6 +304,15 @@ def SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ, ε, method, noise, mean=1, s
     Solving the cumulant ODE for 1 set of parameters
     Initial condition is a gaussian
     """
+    # Loading bell functions
+    global mn1, mn2
+    fN1 = open('./functions/formula_mn1_'+str(N), "rb")
+    fN2 = open('./functions/formula_mn2_'+str(N), "rb")
+    mn1 = pickle.load(fN1)
+    mn2 = pickle.load(fN2)
+    fN1.close()
+    fN2.close()
+
     if noise == "white":
         # -----Init-----
         M0 = [norm.moment(n, loc=mean, scale=std) for n in range(1, N+1)]
@@ -320,7 +325,6 @@ def SolveMoment_ODE(N, t0, t_end, α, θ, σ_m, σ, ε, method, noise, mean=1, s
             return int(τ < STOP_TIME)
 
         stop_time.terminal = True
-        # stop_time.direction = +1
 
         M = solve_ivp(f_moment, (t0, t_end), M0,
                       args=(α, θ, σ_m, σ), method=method, events=stop_time)
@@ -401,7 +405,7 @@ if __name__ == '__main__':
     SCHEME = args.scheme
     FAIL_LIMIT = args.fail_limit
     if args.name == "Data_scheme_alpha_theta_sigma_m.json":
-        FILE_NAME = f"Data_{SCHEME}_{args.alpha}_{args.theta}_{args.sigma_m}.json"
+        FILE_NAME = f"Data_{SCHEME}_{args.noise}_{args.alpha}_{args.theta}_{args.sigma_m}_{args.epsilon}_P{P}.json"
     else:
         FILE_NAME = args.name
     FILE_PATH = f"{args.path}/{FILE_NAME}"
@@ -441,7 +445,8 @@ if __name__ == '__main__':
                             σs,
                             α,
                             θ,
-                            σ_m)
+                            σ_m,
+                            ε)
 
     # Loading data from created or updated file
     with open(FILE_PATH, "r") as file:
@@ -492,6 +497,7 @@ if __name__ == '__main__':
                     else:
                         data_method["points"].insert(indx, 0)
                         print(f"N={N}, σ={σ}, method={method} failed")
+                        print("Value:", M1)
                         FAIL_COUNT += 1
 
                 else:

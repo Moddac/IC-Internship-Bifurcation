@@ -15,7 +15,9 @@ def all_partitions(lst):
                 yield [pair] + rest
 
 def Isserlis(n, E_XtXt, E_Xtηt):
-    
+    """
+    IMPORTANT: do NOT use Isserlis over N=16, it takes way too long (because of all_partitions)
+    """
     # Returns 0 if odd
     if (n+1)%2==1:
         return 0
