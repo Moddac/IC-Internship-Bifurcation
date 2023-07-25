@@ -6,11 +6,13 @@ python Dim_reduction.py\
 	--alpha 1.0\
 	--theta 4.0\
 	--sigma_m 0.0\
-	--sigma_start 1.6\
+	--gamma 100.0\
+	--sigma_start 1.5\
 	--sigma_end 2.0\
-	--N_sigma 100\
-	--N 16\
-	--epsilon 0.001\
-	--name "Test_OU_fail.json"\
-	--delete_file\
+	--N_sigma 10\
+	--N 4\
+	--epsilon 0.01\
+	--stop_time 600\
+	--name "Test_OU_inertia.json" \
+	--delete_file \
 	

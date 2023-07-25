@@ -17,6 +17,8 @@ group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument("--beta", help="Plots according to beta", action="store_true")
 group.add_argument("--sigma", help="Plots according to sigma", action="store_true")
 parser.add_argument("-n", "--name", help="Name of the file if fig is saved.", default="Fig")
+parser.add_argument("--Ns", help="N to be plot. Must be one in Data file. If not precised, all N are displayed.", nargs="*", type=int, default=0)
+parser.add_argument("--methods", help="Choose which methods to display. If not precisded, all methods are displayed", nargs="*", type=str, default="")
 args = parser.parse_args()
 
 if __name__=="__main__":
@@ -41,6 +43,11 @@ if __name__=="__main__":
         methods, Ns, σs = param["methods"], param["Ns"], param["sigmas"]
         σs = np.array(σs)
         βs = 2 / (σs**2)
+
+        if args.Ns != 0:
+            Ns = np.intersect1d(args.Ns, Ns)
+        if args.methods!="":
+            methods = np.intersect1d(args.methods, methods)
 
         for method in methods:
             

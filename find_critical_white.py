@@ -108,4 +108,4 @@ if __name__ == '__main__':
     σ_end = 2.0
 
     # plotSelfConsistency(θ, α, σ_m, σ_start, σ_end)
-    print(σ_c(θ, α, σ_m, σ_start, σ_end))
+    print(σ_c(θ, α, σ_m, σ_start, σ_end).root)

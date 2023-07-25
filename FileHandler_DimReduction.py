@@ -5,7 +5,7 @@ import json
 import numpy as np
 import os
 
-def createFile(file_path, methods, Ns, σs, α, θ, σ_m, ε):
+def createFile(file_path, methods, Ns, σs, α, θ, σ_m, γ, ε):
     """
     Creates .json file if it doesn't exist, and initialize it
     """
@@ -18,6 +18,7 @@ def createFile(file_path, methods, Ns, σs, α, θ, σ_m, ε):
         "alpha": α,
         "theta": θ,
         "sigma_m": σ_m,
+        "gamma": γ,
         "epsilon": ε
     }
 
@@ -50,7 +51,7 @@ def createFile(file_path, methods, Ns, σs, α, θ, σ_m, ε):
     return indx_matrix
 
 
-def updateFile(file_path, methods, Ns, σs, α, θ, σ_m, ε):
+def updateFile(file_path, methods, Ns, σs, α, θ, σ_m, γ, ε):
     """
     Update existing .json file with the new parameters
     """
@@ -62,9 +63,9 @@ def updateFile(file_path, methods, Ns, σs, α, θ, σ_m, ε):
 
     # -----Assert parameters-----
     # Checking if same hyper parameters
-    _α, _θ, _σ_m, _ε = param["alpha"], param["theta"], param["sigma_m"], param["epsilon"]
-    assert (_α, _θ, _σ_m, _ε) == (
-        α, θ, σ_m, ε), f"File with same name exist, but hyper parameters not the same. Please check values in file at {file_path}"
+    _α, _θ, _σ_m, _γ, _ε = param["alpha"], param["theta"], param["sigma_m"], param["gamma"], param["epsilon"]
+    assert (_α, _θ, _σ_m, _γ, _ε) == (
+        α, θ, σ_m, γ, ε), f"File with same name exist, but hyper parameters not the same. Please check values in file at {file_path}"
 
     _methods, _Ns, _σs = param["methods"], param["Ns"], param["sigmas"]
 
@@ -128,7 +129,7 @@ def updateFile(file_path, methods, Ns, σs, α, θ, σ_m, ε):
     return indx_matrix
 
 
-def checkFile(file_path, methods, Ns, σs, α, θ, σ_m, ε):
+def checkFile(file_path, methods, Ns, σs, α, θ, σ_m, γ, ε):
     """
     This checks if the data file already exists.
     It will search locally for a Data/file_name.json file and create
@@ -145,9 +146,9 @@ def checkFile(file_path, methods, Ns, σs, α, θ, σ_m, ε):
     if not os.path.isfile(file_path):
         # If there is no file, create it and set parameters in it
 
-        return createFile(file_path, methods, Ns, σs, α, θ, σ_m, ε)
+        return createFile(file_path, methods, Ns, σs, α, θ, σ_m, γ, ε)
 
     else:
         # If there is a file update it with new parameters
 
-        return updateFile(file_path, methods, Ns, σs, α, θ, σ_m, ε)
+        return updateFile(file_path, methods, Ns, σs, α, θ, σ_m, γ, ε)

@@ -90,7 +90,7 @@ if __name__ == '__main__':
     """
     Important: don't forget the factor ζ which makes data generated before a different  
     """ 
-    ε = 1
+    ε = 1.0
     θ = 4
     α = 1
     τ = ε**2
@@ -99,5 +99,5 @@ if __name__ == '__main__':
 
     # plotSelfConsistency(τ, θ, α, σ_start, σ_end)
     σ_c = np.sqrt(2*D_c(τ, θ, α, σ_start, σ_end))
-    print(σ_c)
-    print(2/(σ_c**2))
+    print("sigma:", σ_c)
+    print("beta:", 2/(σ_c**2))
