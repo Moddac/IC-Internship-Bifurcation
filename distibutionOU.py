@@ -42,8 +42,10 @@ def ρ_st(x, m, D, τ, θ):
     return np.exp(-f_m(x, m, D, τ, θ))*np.abs(1 + τ*H(x, θ))/Z
 
 
-def R(m, D, τ, θ):
+def R(m, σ, τ, θ):
+    D = σ**2 / 2
     return integrate.quad(lambda x: x*ρ_st(x, m, D, τ, θ), -np.inf, np.inf)[0]  
+
 
 def plotSelfConsistency(τ, θ, α, σ_start, σ_end):
     """
@@ -72,7 +74,7 @@ def plotSelfConsistency(τ, θ, α, σ_start, σ_end):
         ax.clear()
 
 
-def D_c(τ, θ, α, σ_before, σ_after):
+def σ_c(τ, θ):
     """
     finding the critical value sigma_c with equation 
     R'(0) = 1
@@ -80,24 +82,8 @@ def D_c(τ, θ, α, σ_before, σ_after):
     """
     # -----Optimize-----
     h = 1e-6
-    def f(D): return (R(h, D, τ, θ) - h - R(0, D, τ, θ)) / h
+    def f(σ): return (R(h, σ, τ, θ) - h - R(0, σ, τ, θ)) / h
 
-    root = optimize.root_scalar(f, bracket=[σ_before, σ_after])
+    root = optimize.root_scalar(f, bracket=[0.1, 100.0])
 
     return root.root
-
-if __name__ == '__main__':
-    """
-    Important: don't forget the factor ζ which makes data generated before a different  
-    """ 
-    ε = 1.0
-    θ = 4
-    α = 1
-    τ = ε**2
-    σ_start = 1.
-    σ_end = 10e5
-
-    # plotSelfConsistency(τ, θ, α, σ_start, σ_end)
-    σ_c = np.sqrt(2*D_c(τ, θ, α, σ_start, σ_end))
-    print("sigma:", σ_c)
-    print("beta:", 2/(σ_c**2))
